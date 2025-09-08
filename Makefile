@@ -5,7 +5,7 @@ ifneq (,$(wildcard .env))
 endif
 
 # Variables
-DOCKER_EXEC_API = docker exec -it docker-compose.dev.yml
+DOCKER_EXEC_API = docker exec -it $(API_CONTAINER_NAME)
 
 # Commands
 dev:

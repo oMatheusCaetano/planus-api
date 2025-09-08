@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/omatheuscaetano/planus-api/internal/config"
+	"github.com/omatheuscaetano/planus-api/internal/router"
 	"github.com/omatheuscaetano/planus-api/internal/shared/app"
 )
 
@@ -14,7 +15,8 @@ func main() {
 	config.Init()
 	log.Println("[CONFIG INITIALIZED SUCCESSFULLY]\n")
 
-	log.Println("[SERVER INITIALIZED SUCCESSFULLY]\n")
-
-	log.Printf("Welcome to %s!\n", app.Name())
+	log.Println("[INITIALIZING ROUTER...]")
+	r := router.Init()
+	log.Println("[ROUTER INITIALIZED SUCCESSFULLY]\n")
+	r.Run(":" + app.ServerPort())
 }
