@@ -1,6 +1,21 @@
 version: "3.9"
 
 services:
+  database:
+    build:
+      context: .
+      dockerfile: .docker/database/dev/Dockerfile
+    image: ${DB_IMAGE_NAME}
+    container_name: ${DB_CONTAINER_NAME}
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:${DB_CONTAINER_PORT}"
+    volumes:
+      - .docker/database/volumes/data:/var/lib/postgresql/data
+
   api:
     build:
       context: .
@@ -12,3 +27,5 @@ services:
     volumes:
       - .:/app
       - /app/bin
+    depends_on:
+      - database

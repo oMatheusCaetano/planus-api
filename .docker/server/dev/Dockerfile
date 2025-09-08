@@ -7,6 +7,9 @@ RUN apk add --no-cache git bash
 # hot-reloading with air
 RUN go install github.com/air-verse/air@latest
 
+# database migration tool
+RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+
 # golangci-lint for IDE integration (Auto-completion, linting, formatting, etc.)
 RUN go install golang.org/x/tools/gopls@latest
 
