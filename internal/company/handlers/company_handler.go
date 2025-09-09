@@ -18,16 +18,10 @@ func NewCompanyHandler(service services.CompanyService) *CompanyHandler {
 }
 
 func (h *CompanyHandler) Find(c *gin.Context) {
-	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	id, _ := strconv.Atoi(c.Param("id"))
+	company, err := h.service.Find(id)
 	if err != nil {
 		responses.Error(c, err)
-		return
-	}
-
-	company, appErr := h.service.Find(id)
-	if appErr != nil {
-		responses.Error(c, appErr)
 		return
 	}
 
