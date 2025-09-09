@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,8 @@ func (h *CompanyHandler) All(c *gin.Context) {
 	page, _ := strconv.Atoi(c.Query("page"))
 	perPage, _ := strconv.Atoi(c.Query("per_page"))
 
+	log.Println(page, perPage)
+
 	if page == 0 && perPage == 0 {
 		data, err := h.service.All()
 		if err != nil {
@@ -31,7 +34,15 @@ func (h *CompanyHandler) All(c *gin.Context) {
 		return
 	}
 
-	paginated, err := h.service.Paginate(1, 10)
+	if perPage == 0 {
+		perPage = 10
+	}
+
+	if page == 0 {
+		page = 1
+	}
+
+	paginated, err := h.service.Paginate(page, perPage)
 	if err != nil {
 		responses.Error(c, err)
 		return
