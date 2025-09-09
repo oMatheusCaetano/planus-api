@@ -17,6 +17,28 @@ func NewCompanyHandler(service services.CompanyService) *CompanyHandler {
 	return &CompanyHandler{service: service}
 }
 
+func (h *CompanyHandler) All(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	perPage, _ := strconv.Atoi(c.Query("per_page"))
+
+	if page == 0 && perPage == 0 {
+		data, err := h.service.All()
+		if err != nil {
+			responses.Error(c, err)
+			return
+		}
+		responses.Ok(c, data, nil)
+		return
+	}
+
+	paginated, err := h.service.Paginate(1, 10)
+	if err != nil {
+		responses.Error(c, err)
+		return
+	}
+	responses.Ok(c, paginated.Data, paginated.Meta)
+}
+
 func (h *CompanyHandler) Find(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	company, err := h.service.Find(id)
@@ -24,7 +46,7 @@ func (h *CompanyHandler) Find(c *gin.Context) {
 		responses.Error(c, err)
 		return
 	}
-	responses.Ok(c, company)
+	responses.Ok(c, company, nil)
 }
 
 func (h *CompanyHandler) Create(c *gin.Context) {
@@ -41,5 +63,5 @@ func (h *CompanyHandler) Create(c *gin.Context) {
 		return
 	}
 
-	responses.Ok(c, company)
+	responses.Ok(c, company, nil)
 }

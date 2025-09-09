@@ -19,7 +19,7 @@ type ApiJSONResponse struct {
     Meta      interface{} `json:"meta"`
 }
 
-func JSONReturn(code int, message string, payload interface{}) *ApiJSONResponse {
+func JSONReturn(code int, message string, payload interface{}, meta interface{}) *ApiJSONResponse {
     isSuccess := code >= 200 && code < 400
     isError := !isSuccess
 	var msg string
@@ -35,27 +35,27 @@ func JSONReturn(code int, message string, payload interface{}) *ApiJSONResponse 
 		Message:   msg,
 		IsError:   isError,
 		IsSuccess: isSuccess,
-		Meta:      nil,
+		Meta:      meta,
 		Data:      payload,
 	}
 }
 
-func JSON(c *gin.Context, code int, message string, payload interface{}) {
-    response := JSONReturn(code, message, payload)
+func JSON(c *gin.Context, code int, message string, payload interface{}, meta interface{}) {
+    response := JSONReturn(code, message, payload, meta)
 	c.JSON(response.Code, response)
 }
 
 func Error(c *gin.Context, err error) {
     apiError := errs.From(err)
-    JSON(c, apiError.Code, apiError.Message, nil)
+    JSON(c, apiError.Code, apiError.Message, nil, nil)
 }
 
 func BadRequest(c *gin.Context, err error) {
-	JSON(c, http.StatusBadRequest, err.Error(), translateValidationErrors(err))
+	JSON(c, http.StatusBadRequest, err.Error(), translateValidationErrors(err), nil)
 }
 
-func Ok(c *gin.Context, payload interface{}) {
-	JSON(c, http.StatusOK, "", payload)
+func Ok(c *gin.Context, payload interface{}, meta interface{}) {
+	JSON(c, http.StatusOK, "", payload, meta)
 }
 
 func translateValidationErrors(err error) map[string]string {
