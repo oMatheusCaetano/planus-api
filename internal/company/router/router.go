@@ -17,5 +17,6 @@ func InitRoutes(r *gin.RouterGroup) {
 	company := r.Group("/company")
 	{
 		company.GET("/:id", companyHandler.Find)
+		company.POST("", companyHandler.Create)
 	}
 }

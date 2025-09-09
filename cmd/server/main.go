@@ -1,22 +1,15 @@
 package main
 
 import (
-	"log"
-
 	"github.com/omatheuscaetano/planus-api/internal/config"
 	"github.com/omatheuscaetano/planus-api/internal/router"
 	"github.com/omatheuscaetano/planus-api/internal/shared/app"
+	"github.com/omatheuscaetano/planus-api/internal/shared/validators"
 )
 
 func main() {
-	log.Println("[INITIALIZING SERVER...]\n")
-
-	log.Println("[INITIALIZING CONFIG...]")
 	config.Init()
-	log.Println("[CONFIG INITIALIZED SUCCESSFULLY]\n")
-
-	log.Println("[INITIALIZING ROUTER...]")
+	validators.Init()
 	r := router.Init()
-	log.Println("[ROUTER INITIALIZED SUCCESSFULLY]\n")
 	r.Run(":" + app.ServerPort())
 }

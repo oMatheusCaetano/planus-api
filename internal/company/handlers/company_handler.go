@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omatheuscaetano/planus-api/internal/company/models"
 	"github.com/omatheuscaetano/planus-api/internal/company/services"
 	"github.com/omatheuscaetano/planus-api/internal/shared/responses"
 )
@@ -24,6 +24,22 @@ func (h *CompanyHandler) Find(c *gin.Context) {
 		responses.Error(c, err)
 		return
 	}
+	responses.Ok(c, company)
+}
 
-	c.JSON(http.StatusOK, company)
+func (h *CompanyHandler) Create(c *gin.Context) {
+	var company models.Company
+
+	if err := c.ShouldBindJSON(&company); err != nil {
+		responses.BadRequest(c, err)
+		return
+	}
+
+	err := h.service.Create(&company)
+	if err != nil {
+		responses.Error(c, err)
+		return
+	}
+
+	responses.Ok(c, company)
 }
