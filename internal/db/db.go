@@ -12,23 +12,35 @@ import (
 )
 
 var (
-	db   *sql.DB
+	con   *sql.DB
 	once sync.Once
 )
 
-func GetDB() *sql.DB {
+
+func Init() {
 	once.Do(func() {
 		var err error
 		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
             app.DBHost(), app.DBUser(), app.DBPassword(), app.DBName(), app.DBPort(),
         )
-		db, err = sql.Open("postgres", dsn)
+		con, err = sql.Open("postgres", dsn)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := db.Ping(); err != nil {
+		if err := con.Ping(); err != nil {
 			log.Fatal(err)
 		}
 	})
-	return db
+}
+
+type SortBy struct {
+    Key       string `json:"key"`
+    Direction string `json:"direction"`
+}
+
+type Where struct {
+    Key      string  `json:"key"`
+    Operator string  `json:"operator"`
+    Type     string  `json:"type"`
+    Value    any     `json:"value"`
 }

@@ -6,7 +6,7 @@ endif
 
 # Variables
 DOCKER_EXEC_API = docker exec -it $(API_CONTAINER_NAME)
-MIGRATIONS_DIR = internal/database/migrations
+MIGRATIONS_DIR = internal/db/migrations
 DB_CONNECTION_STRING = "user=$(DB_USER) password=$(DB_PASSWORD) host=$(DB_HOST) port=$(DB_CONTAINER_PORT) dbname=$(DB_NAME) sslmode=disable"
 
 # Commands

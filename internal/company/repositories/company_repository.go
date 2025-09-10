@@ -1,69 +1,86 @@
 package repositories
 
 import (
+	// "fmt"
+	// "strings"
+
 	"database/sql"
 
 	"github.com/omatheuscaetano/planus-api/internal/company/models"
+	"github.com/omatheuscaetano/planus-api/internal/db"
+
+	// "github.com/omatheuscaetano/planus-api/internal/shared/dto"
 	"github.com/omatheuscaetano/planus-api/internal/shared/dto"
 	"github.com/omatheuscaetano/planus-api/internal/shared/errs"
 )
 
 type CompanyRepository interface {
-    Paginate(offset, limit int) (dto.Paginated[models.Company], *errs.Error)
-    All() ([]models.Company, *errs.Error)
+    Paginate(props dto.PaginationProps) (*dto.Paginated[models.Company], *errs.Error)
+    All(props dto.ListingProps) (*[]models.Company, *errs.Error)
 	Find(id int) (*models.Company, *errs.Error)
-    Create(company *models.Company) *errs.Error
+    // Create(company *models.Company) *errs.Error
 }
 
 type companyRepository struct {
-	db *sql.DB
 }
 
-func NewCompanyRepository(db *sql.DB) CompanyRepository {
-	return &companyRepository{db: db}
+func NewCompanyRepository() CompanyRepository {
+	return &companyRepository{}
 }
 
-func (r *companyRepository) Paginate(offset, limit int) (dto.Paginated[models.Company], *errs.Error) {
-    var total int
-    countQuery := "SELECT COUNT(*) FROM companies"
-    err := r.db.QueryRow(countQuery).Scan(&total)
+func (r *companyRepository) Paginate(props dto.PaginationProps) (*dto.Paginated[models.Company], *errs.Error) {
+    counterQb := db.From("companies")
+    total, err := counterQb.Count()
     if err != nil {
-        return dto.Paginated[models.Company]{}, errs.From(err)
+        return nil, err
     }
 
-    query := "SELECT * FROM companies ORDER BY id LIMIT $1 OFFSET $2"
-    rows, err := r.db.Query(query, limit, offset)
-    if err != nil {
-        return dto.Paginated[models.Company]{}, errs.From(err)
+    if (props.PerPage == 0) {
+        props.PerPage = 10
     }
-    defer rows.Close()
+
+    if (props.Page == 0) {
+        props.Page = 1
+    }
+    
+    query := counterQb.
+        Duplicate().
+        Limit(props.PerPage).
+        Offset((props.Page - 1) * props.PerPage)
+
+    for _, sort := range props.SortBy {
+        if (sort.Direction != "asc" && sort.Direction != "desc") {
+            sort.Direction = "asc"
+        }
+
+        query.SortBy(sort.Key, sort.Direction)
+    }
 
     var companies []models.Company
-    for rows.Next() {
-        var company models.Company
-        err := rows.Scan(&company.ID, &company.Name, &company.CNPJ, &company.CreatedAt, &company.UpdatedAt)
+    scanError := query.ScanMany(companies, func (rows *sql.Rows) error {
+        var model models.Company
+        err := rows.Scan(&model.ID, &model.Name, &model.CNPJ, &model.CreatedAt, &model.UpdatedAt)
         if err != nil {
-            return dto.Paginated[models.Company]{}, errs.From(err)
+            return err
         }
-        companies = append(companies, company)
+        companies = append(companies, model)
+        return nil
+    })
+
+
+    if scanError != nil {
+        return nil, scanError
     }
 
-    if err = rows.Err(); err != nil {
-        return dto.Paginated[models.Company]{}, errs.From(err)
-    }
-
-    currentPage := (offset / limit) + 1
-    lastPage := (total + limit - 1) / limit
-
-    paginated := dto.Paginated[models.Company]{
+    paginated := &dto.Paginated[models.Company]{
         Meta: dto.PaginationMeta{
             Total:       total,
-            PerPage:     limit,
-            CurrentPage: currentPage,
-            LastPage:    lastPage,
+            PerPage:     props.PerPage,
+            Page:        props.Page,
+            LastPage:    (total + props.PerPage - 1) / props.PerPage,
             FirstPage:   1,
-            SortBy:      []dto.PaginationSortBy{{Key: "id", Direction: "asc"}},
-            Where:       []dto.PaginationWhere{},
+            SortBy:      []db.SortBy{{Key: "id", Direction: "asc"}},
+            Where:       []db.Where{},
         },
         Data: companies,
     }
@@ -71,46 +88,68 @@ func (r *companyRepository) Paginate(offset, limit int) (dto.Paginated[models.Co
     return paginated, nil
 }
 
-func (r *companyRepository) All() ([]models.Company, *errs.Error) {
+func (r *companyRepository) All(props dto.ListingProps) (*[]models.Company, *errs.Error) {
     var companies []models.Company
-    query := "SELECT * FROM companies"
-    rows, err := r.db.Query(query)
-    if err != nil {
-        return nil, errs.From(err)
-    }
-    defer rows.Close()
+    query := db.From("companies");
 
-    for rows.Next() {
-        var company models.Company
-        err := rows.Scan(&company.ID, &company.Name, &company.CNPJ, &company.CreatedAt, &company.UpdatedAt)
-        if err != nil {
-            return nil, errs.From(err)
+    for _, sort := range props.SortBy {
+        if (sort.Direction != "asc" && sort.Direction != "desc") {
+            sort.Direction = "asc"
         }
-        companies = append(companies, company)
+
+        query.SortBy(sort.Key, sort.Direction)
     }
 
-    if err = rows.Err(); err != nil {
-        return nil, errs.From(err)
-    }
+    err := query.ScanMany(companies, func (rows *sql.Rows) error {
+        var model models.Company
+        err := rows.Scan(&model.ID, &model.Name, &model.CNPJ, &model.CreatedAt, &model.UpdatedAt)
+        if err != nil {
+            return err
+        }
+        companies = append(companies, model)
+        return nil
+    })
 
-    return companies, nil
+
+    if err != nil {
+        return nil, err
+    }
+    return &companies, nil
 }
 
 func (r *companyRepository) Find(id int) (*models.Company, *errs.Error) {
     var company models.Company
-    query := "SELECT * FROM companies WHERE id = $1"
-    err := r.db.QueryRow(query, id).Scan(&company.ID, &company.Name, &company.CNPJ, &company.CreatedAt, &company.UpdatedAt)
+
+    err := db.From("companies").Where("id", "=", id).
+        Scan(&company.ID, &company.Name, &company.CNPJ, &company.CreatedAt, &company.UpdatedAt)
+
     if err != nil {
-        return nil, errs.From(err)
+        return nil, err
     }
     return &company, nil
 }
 
-func (r *companyRepository) Create(company *models.Company) *errs.Error {
-    query := "INSERT INTO companies (name, cnpj, created_at, updated_at) VALUES ($1, $2, $3, $4) RETURNING id"
-    err := r.db.QueryRow(query, company.Name, company.CNPJ, company.CreatedAt, company.UpdatedAt).Scan(&company.ID)
-    if err != nil {
-        return errs.From(err)
-    }
-    return nil
-}
+
+
+    // err := db.Row(db.Select{
+    //     From: "companies",
+    //     Where: []db.Where{
+    //         {Key: "id", Operator: "=", Value: id},
+    //     },
+    //     Limit: 1,
+    // }, &company.ID, &company.Name, &company.CNPJ, &company.CreatedAt, &company.UpdatedAt)
+
+    // if err != nil {
+    //     return nil, err
+    // }
+    // return &company, nil
+// }
+
+// func (r *companyRepository) Create(company *models.Company) *errs.Error {
+//     query := "INSERT INTO companies (name, cnpj, created_at, updated_at) VALUES ($1, $2, $3, $4) RETURNING id"
+//     err := r.db.QueryRow(query, company.Name, company.CNPJ, company.CreatedAt, company.UpdatedAt).Scan(&company.ID)
+//     if err != nil {
+//         return errs.From(err)
+//     }
+//     return nil
+// }

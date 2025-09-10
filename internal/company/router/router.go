@@ -5,12 +5,10 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/company/handlers"
 	"github.com/omatheuscaetano/planus-api/internal/company/repositories"
 	"github.com/omatheuscaetano/planus-api/internal/company/services"
-	db "github.com/omatheuscaetano/planus-api/internal/database"
 )
 
 func InitRoutes(r *gin.RouterGroup) {
-	sqlDB := db.GetDB()
-	companyRepo := repositories.NewCompanyRepository(sqlDB)
+	companyRepo := repositories.NewCompanyRepository()
 	companyService := services.NewCompanyService(companyRepo)
 	companyHandler := handlers.NewCompanyHandler(companyService)
 
@@ -18,6 +16,6 @@ func InitRoutes(r *gin.RouterGroup) {
 	{
 		company.GET("", companyHandler.All)
 		company.GET("/:id", companyHandler.Find)
-		company.POST("", companyHandler.Create)
+		// company.POST("", companyHandler.Create)
 	}
 }

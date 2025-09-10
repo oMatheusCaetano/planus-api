@@ -1,11 +1,10 @@
 package validators
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	db "github.com/omatheuscaetano/planus-api/internal/database"
+	"github.com/omatheuscaetano/planus-api/internal/db"
 )
 
 var unique validator.Func = func(fl validator.FieldLevel) bool {
@@ -23,9 +22,9 @@ var unique validator.Func = func(fl validator.FieldLevel) bool {
 }
 
 func Unique(tableName string, fieldName string, value interface{}) bool {
-    sqlDB := db.GetDB()
-    var exists bool
-    query := fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %s WHERE %s = $1 LIMIT 1)`, tableName, fieldName)
-    sqlDB.QueryRow(query, value).Scan(&exists)
+    exists, _ := db.
+        From(tableName).
+        Where(fieldName, "=", value).
+        Exists()
     return !exists
 }

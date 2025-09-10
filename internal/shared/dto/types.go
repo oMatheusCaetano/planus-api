@@ -1,28 +1,29 @@
 package dto
 
-type PaginationSortBy struct {
-    Key       string `json:"key"`
-    Direction string `json:"direction"`
+import "github.com/omatheuscaetano/planus-api/internal/db"
+
+type ListingProps struct {
+    SortBy []db.SortBy
 }
 
-type PaginationWhere struct {
-    Key      string      `json:"key"`
-    Operator string      `json:"operator"`
-    Type     string      `json:"type"`
-    Value    interface{} `json:"value"`
+type PaginationProps struct {
+    PerPage int
+    Page   int
+    SortBy []db.SortBy
 }
 
 type PaginationMeta struct {
-    Total       int                `json:"total"`
-    PerPage     int                `json:"per_page"`
-    CurrentPage int                `json:"current_page"`
-    LastPage    int                `json:"last_page"`
-    FirstPage   int                `json:"first_page"`
-    SortBy      []PaginationSortBy `json:"sort_by"`
-    Where       []PaginationWhere  `json:"where"`
+    Total       int        `json:"total"`
+    PerPage     int        `json:"per_page"`
+    Page        int        `json:"page"`
+    LastPage    int        `json:"last_page"`
+    FirstPage   int        `json:"first_page"`
+    SortBy      []db.SortBy `json:"sort_by"`
+    Where       []db.Where  `json:"where"`
 }
 
 type Paginated[T any] struct {
 	Meta PaginationMeta `json:"meta"`
     Data []T            `json:"data"`
 }
+    
