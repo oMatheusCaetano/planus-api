@@ -30,6 +30,11 @@ func NewCompanyRepository() CompanyRepository {
 
 func (r *companyRepository) Paginate(props dto.PaginationProps) (*dto.Paginated[models.Company], *errs.Error) {
     counterQb := db.From("companies")
+
+    if len(props.Where) > 0 {
+        counterQb.WhereFromLogicBlock(props.Where)
+    }
+
     total, err := counterQb.Count()
     if err != nil {
         return nil, err
@@ -89,8 +94,52 @@ func (r *companyRepository) Paginate(props dto.PaginationProps) (*dto.Paginated[
 }
 
 func (r *companyRepository) All(props dto.ListingProps) (*[]models.Company, *errs.Error) {
+    
     var companies []models.Company
     query := db.From("companies");
+
+    if len(props.Where) > 0 {
+        query.WhereFromLogicBlock(props.Where)
+    }
+
+    // query.
+    //     Where("id", "<", 10).
+    //     Where("name", "like", "%a%").
+    //     Or("name", "like", "%b%").
+    //     WhereSub(func (subQb *db.SelectQb) *db.SelectQb {
+    //         return subQb.
+    //             Where("cnpj", "like", "%1%").
+    //             Or("cnpj", "like", "%2%")
+    //     })
+
+
+    // query.WhereFromLogicBlock([]db.WhereLogicBlock{
+    //     {
+    //         Operator: "and",
+    //         Condition: db.Where{Key: "id", Operator: "<", Value: 10},
+    //     },
+    //     {
+    //         Operator: "and",
+    //         Condition: db.Where{Key: "name", Operator: "like", Value: "%a%"},
+    //     },
+    //     {
+    //         Operator: "or",
+    //         Condition: db.Where{Key: "name", Operator: "like", Value: "%a%"},
+    //     },
+    //     {
+    //         Operator: "and",
+    //         Condition: []db.WhereLogicBlock{
+    //             {
+    //                 Operator: "and",
+    //                 Condition: db.Where{Key: "cnpj", Operator: "like", Value: "%1%"},
+    //             },
+    //             {
+    //                 Operator: "or",
+    //                 Condition: db.Where{Key: "cnpj", Operator: "like", Value: "%2%"},
+    //             },
+    //         },
+    //     },
+    // })
 
     for _, sort := range props.SortBy {
         if (sort.Direction != "asc" && sort.Direction != "desc") {

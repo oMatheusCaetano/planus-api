@@ -3,17 +3,34 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/omatheuscaetano/planus-api/internal/shared/errs"
 )
+
+type SortBy struct {
+    Key       string `json:"key"`
+    Direction string `json:"direction"`
+}
+
+type Where struct {
+	Key      string      `json:"key"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
+}
+
+type WhereLogicBlock struct {
+	Operator  string      `json:"operator"` // "and" or "or"
+	Condition interface{} `json:"condition"` // Where or []LogicBlock
+}
 
 type SelectQb struct {
     tableName    string
     selectFields []string
     limit        int
     offset       int
-    where        []Where
+    where        []WhereLogicBlock
     sortBy       []SortBy
 }
 
@@ -43,10 +60,46 @@ func (s *SelectQb) Offset(offset int) *SelectQb {
     return s
 }
 
-func (s *SelectQb) Where(column string, operator string, value any) *SelectQb {
-    s.where = append(s.where, Where{Key: column, Operator: operator, Value: value})
+func (s *SelectQb) WhereFromLogicBlock(blocks []WhereLogicBlock) *SelectQb {
+    s.where = append(s.where, blocks...)
     return s
 }
+
+func (s *SelectQb) Where(column string, operator string, value any) *SelectQb {
+    s.where = append(s.where, WhereLogicBlock{
+        Operator:  "and",
+        Condition: Where{Key: column, Operator: operator, Value: value},
+    })
+    return s
+}
+
+func (s *SelectQb) Or(column string, operator string, value any) *SelectQb {
+    s.where = append(s.where, WhereLogicBlock{
+        Operator:  "or",
+        Condition: Where{Key: column, Operator: operator, Value: value},
+    })
+    return s
+}
+
+
+func (s *SelectQb) WhereSub(callback func (subQueryBuilder *SelectQb) *SelectQb) *SelectQb {
+    subQb := callback(&SelectQb{})
+    s.where = append(s.where, WhereLogicBlock{
+        Operator:  "and",
+        Condition: subQb.where,
+    })
+    return s
+}
+
+func (s *SelectQb) OrSub(callback func (subQueryBuilder *SelectQb) *SelectQb) *SelectQb {
+    subQb := callback(&SelectQb{})
+    s.where = append(s.where, WhereLogicBlock{
+        Operator:  "or",
+        Condition: subQb.where,
+    })
+    return s
+}
+
 
 func (s *SelectQb) SortBy(column string, direction string) *SelectQb {
     s.sortBy = append(s.sortBy, SortBy{Key: column, Direction: direction})
@@ -80,7 +133,7 @@ func (s *SelectQb) Duplicate() *SelectQb {
         selectFields: append([]string{}, s.selectFields...),
         limit:        s.limit,
         offset:       s.offset,
-        where:        append([]Where{}, s.where...),
+        where:        append([]WhereLogicBlock{}, s.where...),
         sortBy:       append([]SortBy{}, s.sortBy...),
     }
 }
@@ -127,12 +180,56 @@ func (s *SelectQb) ToSql() (string, []any) {
 
     //! Where
     if len(s.where) > 0 {
-        var conditions []string
-        for i, where := range s.where {
-            conditions = append(conditions, fmt.Sprintf("%s %s $%d", where.Key, where.Operator, i+1))
-            args = append(args, where.Value)
+        var processCondition func(cond interface{}) (string, error)
+        processCondition = func(cond interface{}) (string, error) {
+            switch c := cond.(type) {
+            case Where:
+                c.Operator, c.Value = mapOperatorsToSql(c.Operator, c.Value)
+                args = append(args, c.Value)
+                return fmt.Sprintf("%s %s $%d", c.Key, c.Operator, len(args)), nil
+            case WhereLogicBlock:
+                if logicCond, ok := c.Condition.([]WhereLogicBlock); ok {
+                    var subConditions []string
+                    for _, subCond := range logicCond {
+                        subCondStr, err := processCondition(subCond)
+                        if err != nil {
+                            return "", err
+                        }
+                        op := "AND"
+                        if subCond.Operator == "or" {
+                            op = "OR"
+                        }
+                        subConditions = append(subConditions, op + " " + subCondStr)
+                    }
+                    return "(" + strings.Join(subConditions, " ") + ")", nil
+                } else {
+                    return processCondition(c.Condition)
+                }
+            default:
+                return "", fmt.Errorf("invalid condition type")
+            }
         }
-        query += " WHERE " + strings.Join(conditions, " AND ")
+
+        var conditions []string
+
+        for _, block := range s.where {
+            condStr, err := processCondition(block)
+            if err != nil {
+                // Handle error appropriately, here we just return an empty query and args
+                return "", nil
+            }
+            op := "AND"
+            if block.Operator == "or" {
+                op = "OR"
+            }
+            conditions = append(conditions, op + " " + condStr)
+        }
+
+        q := (" WHERE " + strings.Join(conditions, " "))
+        q = strings.ReplaceAll(q, "WHERE AND", "WHERE")
+        q = strings.ReplaceAll(q, "AND (AND", "AND (")
+        q = strings.ReplaceAll(q, "OR (AND", "OR (")
+        query += q
     }
 
     //! Sort By
@@ -156,10 +253,29 @@ func (s *SelectQb) ToSql() (string, []any) {
         args = append(args, s.offset)
     }
 
-    //! Returning
-    // if len(qb.Returning) > 0 {
-    //     query += " RETURNING " + strings.Join(qb.Returning, ", ")
-    // }
 
+    log.Printf("\n\n\n\n\n\n")
+    log.Printf(query)
+    log.Println(args)
+    log.Printf("\n\n\n\n\n\n")
     return query, args
 }
+
+func mapOperatorsToSql(operator string, value any) (string, any) {
+    switch operator {
+        case "contain":
+        case "contains":
+            return "ILIKE", fmt.Sprintf("%%%v%%", value)
+        case "startWith":
+        case "startsWith":
+            return "ILIKE", fmt.Sprintf("%v%%", value)
+        case "endWith":
+        case "endsWith":
+            return "ILIKE", fmt.Sprintf("%%%v", value)
+        default:
+            return operator, value
+    }
+
+    return operator, value
+}
+

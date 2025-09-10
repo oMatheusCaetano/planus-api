@@ -32,15 +32,3 @@ func Init() {
 		}
 	})
 }
-
-type SortBy struct {
-    Key       string `json:"key"`
-    Direction string `json:"direction"`
-}
-
-type Where struct {
-    Key      string  `json:"key"`
-    Operator string  `json:"operator"`
-    Type     string  `json:"type"`
-    Value    any     `json:"value"`
-}

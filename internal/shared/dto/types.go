@@ -3,21 +3,23 @@ package dto
 import "github.com/omatheuscaetano/planus-api/internal/db"
 
 type ListingProps struct {
-    SortBy []db.SortBy
+    SortBy  []db.SortBy
+    Where   []db.WhereLogicBlock
 }
 
 type PaginationProps struct {
     PerPage int
-    Page   int
-    SortBy []db.SortBy
+    Page    int
+    SortBy  []db.SortBy
+    Where   []db.WhereLogicBlock
 }
 
 type PaginationMeta struct {
-    Total       int        `json:"total"`
-    PerPage     int        `json:"per_page"`
-    Page        int        `json:"page"`
-    LastPage    int        `json:"last_page"`
-    FirstPage   int        `json:"first_page"`
+    Total       int         `json:"total"`
+    PerPage     int         `json:"per_page"`
+    Page        int         `json:"page"`
+    LastPage    int         `json:"last_page"`
+    FirstPage   int         `json:"first_page"`
     SortBy      []db.SortBy `json:"sort_by"`
     Where       []db.Where  `json:"where"`
 }

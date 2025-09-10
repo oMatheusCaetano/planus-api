@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"strconv"
 	"strings"
 
@@ -20,7 +19,76 @@ func NewCompanyHandler(service services.CompanyService) *CompanyHandler {
 	return &CompanyHandler{service: service}
 }
 
+func parseWhereCondition(condition any) db.WhereLogicBlock {
+	var conditionOrBlock string
+
+	conditionMap := condition.(map[string]interface{})
+
+	if cond, ok := conditionMap["condition"].([]interface{}); ok {
+		var conditions []db.WhereLogicBlock
+		for _, c := range cond {
+			conditions = append(conditions, parseWhereCondition(c))
+		}
+		return db.WhereLogicBlock{
+			Operator:  conditionMap["operator"].(string),
+			Condition: conditions,
+		}
+	} else if cond, ok := conditionMap["condition"].(map[string]interface{}); ok {
+		conditionOrBlock = cond["operator"].(string)
+		return db.WhereLogicBlock{
+			Operator: conditionMap["operator"].(string),
+			Condition: db.Where{
+				Key:      cond["key"].(string),
+				Operator: conditionOrBlock,
+				Value:    cond["value"],
+			},
+		}
+	}
+
+	return db.WhereLogicBlock{}
+}
+
 func (h *CompanyHandler) All(c *gin.Context) {
+	// {
+	// 	"where": [
+	// 		{
+	// 			"operator": "and",
+	// 			"condition": { "field": "age", "operator": ">=", "value": 30 }
+	// 		},
+	// 		{
+	// 			"operator": "and",
+	// 			"condition": { "field": "age", "operator": "<=", "value": 60 }
+	// 		},
+	// 		{
+	// 			"operator": "or",
+	// 			"condition": [
+	// 			{
+	// 				"operator": "and",
+	// 				"condition": { "field": "name", "operator": "startsWith", "value": "Matheus" }
+	// 			},
+	// 			{
+	// 				"operator": "or",
+	// 				"condition": { "field": "name", "operator": "endsWith", "value": "Caetano" }
+	// 			}
+	// 			]
+	// 		}
+	// 	]
+	// }
+	var body any
+	if err := c.ShouldBindJSON(&body); err != nil {
+		responses.BadRequest(c, err)
+		return
+	}
+
+	//? Where Conditions
+	var conditions []db.WhereLogicBlock
+	if where, ok := body.(map[string]any)["where"]; ok {
+
+		for _, whereItem := range where.([]interface{}) {
+			conditions = append(conditions, parseWhereCondition(whereItem) )
+		}
+	}
+
 	//? Sort By
 	var sortByDto []db.SortBy
 	sortByQuery := c.Query("sort_by")
@@ -35,7 +103,6 @@ func (h *CompanyHandler) All(c *gin.Context) {
 			if len(split) > 1 {
 				direction = split[1]
 			}
-			log.Println("Sort:", key, direction, sortBy)
 			sortByDto = append(sortByDto, db.SortBy{
 				Key:       key,
 				Direction: direction,
@@ -52,6 +119,7 @@ func (h *CompanyHandler) All(c *gin.Context) {
 	if page == 0 && perPage == 0 {
 		data, err := h.service.All(dto.ListingProps{
 			SortBy: sortByDto,
+			Where:  conditions,
 		})
 		if err != nil {
 			responses.Error(c, err)
@@ -66,6 +134,7 @@ func (h *CompanyHandler) All(c *gin.Context) {
 		Page:    page,
 		PerPage: perPage,
 		SortBy:  sortByDto,
+		Where:  conditions,
 	})
 	if err != nil {
 		responses.Error(c, err)
