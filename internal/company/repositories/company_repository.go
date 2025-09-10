@@ -1,15 +1,11 @@
 package repositories
 
 import (
-	// "fmt"
-	// "strings"
-
 	"database/sql"
 
 	"github.com/omatheuscaetano/planus-api/internal/company/models"
 	"github.com/omatheuscaetano/planus-api/internal/db"
 
-	// "github.com/omatheuscaetano/planus-api/internal/shared/dto"
 	"github.com/omatheuscaetano/planus-api/internal/shared/dto"
 	"github.com/omatheuscaetano/planus-api/internal/shared/errs"
 )
@@ -18,7 +14,7 @@ type CompanyRepository interface {
     Paginate(props dto.PaginationProps) (*dto.Paginated[models.Company], *errs.Error)
     All(props dto.ListingProps) (*[]models.Company, *errs.Error)
 	Find(id int) (*models.Company, *errs.Error)
-    // Create(company *models.Company) *errs.Error
+    Create(company *models.Company) *errs.Error
 }
 
 type companyRepository struct {
@@ -102,45 +98,6 @@ func (r *companyRepository) All(props dto.ListingProps) (*[]models.Company, *err
         query.WhereFromLogicBlock(props.Where)
     }
 
-    // query.
-    //     Where("id", "<", 10).
-    //     Where("name", "like", "%a%").
-    //     Or("name", "like", "%b%").
-    //     WhereSub(func (subQb *db.SelectQb) *db.SelectQb {
-    //         return subQb.
-    //             Where("cnpj", "like", "%1%").
-    //             Or("cnpj", "like", "%2%")
-    //     })
-
-
-    // query.WhereFromLogicBlock([]db.WhereLogicBlock{
-    //     {
-    //         Operator: "and",
-    //         Condition: db.Where{Key: "id", Operator: "<", Value: 10},
-    //     },
-    //     {
-    //         Operator: "and",
-    //         Condition: db.Where{Key: "name", Operator: "like", Value: "%a%"},
-    //     },
-    //     {
-    //         Operator: "or",
-    //         Condition: db.Where{Key: "name", Operator: "like", Value: "%a%"},
-    //     },
-    //     {
-    //         Operator: "and",
-    //         Condition: []db.WhereLogicBlock{
-    //             {
-    //                 Operator: "and",
-    //                 Condition: db.Where{Key: "cnpj", Operator: "like", Value: "%1%"},
-    //             },
-    //             {
-    //                 Operator: "or",
-    //                 Condition: db.Where{Key: "cnpj", Operator: "like", Value: "%2%"},
-    //             },
-    //         },
-    //     },
-    // })
-
     for _, sort := range props.SortBy {
         if (sort.Direction != "asc" && sort.Direction != "desc") {
             sort.Direction = "asc"
@@ -178,27 +135,20 @@ func (r *companyRepository) Find(id int) (*models.Company, *errs.Error) {
     return &company, nil
 }
 
+func (r *companyRepository) Create(company *models.Company) *errs.Error {
+    err := db.
+        Insert("companies").
+        Values(map[string]interface{}{
+            "name": company.Name,
+            "cnpj": company.CNPJ,
+            "created_at": company.CreatedAt,
+            "updated_at": company.UpdatedAt,
+        }).
+        Returning("id").
+        Scan(&company.ID)
 
-
-    // err := db.Row(db.Select{
-    //     From: "companies",
-    //     Where: []db.Where{
-    //         {Key: "id", Operator: "=", Value: id},
-    //     },
-    //     Limit: 1,
-    // }, &company.ID, &company.Name, &company.CNPJ, &company.CreatedAt, &company.UpdatedAt)
-
-    // if err != nil {
-    //     return nil, err
-    // }
-    // return &company, nil
-// }
-
-// func (r *companyRepository) Create(company *models.Company) *errs.Error {
-//     query := "INSERT INTO companies (name, cnpj, created_at, updated_at) VALUES ($1, $2, $3, $4) RETURNING id"
-//     err := r.db.QueryRow(query, company.Name, company.CNPJ, company.CreatedAt, company.UpdatedAt).Scan(&company.ID)
-//     if err != nil {
-//         return errs.From(err)
-//     }
-//     return nil
-// }
+    if err != nil {
+        return errs.From(err)
+    }
+    return nil
+}

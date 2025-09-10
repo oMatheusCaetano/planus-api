@@ -9,6 +9,8 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/shared/errs"
 )
 
+//! READ
+
 type SortBy struct {
     Key       string `json:"key"`
     Direction string `json:"direction"`
@@ -99,7 +101,6 @@ func (s *SelectQb) OrSub(callback func (subQueryBuilder *SelectQb) *SelectQb) *S
     })
     return s
 }
-
 
 func (s *SelectQb) SortBy(column string, direction string) *SelectQb {
     s.sortBy = append(s.sortBy, SortBy{Key: column, Direction: direction})
@@ -279,3 +280,75 @@ func mapOperatorsToSql(operator string, value any) (string, any) {
     return operator, value
 }
 
+
+//! WRITE
+
+type Body struct {
+    Key   string
+    Value any
+}
+
+type InsertQb struct {
+    tableName    string
+    columns     []string
+    values      []any
+    returning   []string
+}
+
+func Insert(tableName string) *InsertQb {
+    return &InsertQb{tableName: tableName}
+}
+
+func (q *InsertQb) Values(values map[string]any) *InsertQb {
+    for col, val := range values {
+        q.columns = append(q.columns, col)
+        q.values = append(q.values, val)
+    }
+    return q
+}
+
+func (q *InsertQb) Returning(columns ...string) *InsertQb {
+    q.returning = columns
+    return q
+}
+
+func (q *InsertQb) ToSql() (string, []any) {
+    var args []any
+    var placeholders []string
+
+    for i, val := range q.values {
+        args = append(args, val)
+        placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+    }
+
+    query := fmt.Sprintf(
+        "INSERT INTO %s (%s) VALUES (%s)",
+        q.tableName,
+        strings.Join(q.columns, ", "),
+        strings.Join(placeholders, ", "),
+    )
+
+    if len(q.returning) > 0 {
+        query += fmt.Sprintf(" RETURNING %s", strings.Join(q.returning, ", "))
+    }
+
+    return query, args
+}
+
+func (q *InsertQb) Scan(dest ...any) *errs.Error {
+    query, args := q.ToSql()
+    err := con.QueryRow(query, args...).Scan(dest...)
+    if err != nil {
+        return errs.From(err)
+    }
+    return nil
+}
+
+func (q *InsertQb) Run() (*sql.Rows, *errs.Error) {
+    query, args := q.ToSql()
+    rows, err := con.Query(query, args...)
+    if err != nil {
+        return nil, errs.From(err)
+    }
+    return rows, nil
+}

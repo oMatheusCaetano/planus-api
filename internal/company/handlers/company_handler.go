@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/omatheuscaetano/planus-api/internal/company/models"
 	"github.com/omatheuscaetano/planus-api/internal/company/services"
 	"github.com/omatheuscaetano/planus-api/internal/db"
 	"github.com/omatheuscaetano/planus-api/internal/shared/dto"
@@ -49,32 +50,7 @@ func parseWhereCondition(condition any) db.WhereLogicBlock {
 }
 
 func (h *CompanyHandler) All(c *gin.Context) {
-	// {
-	// 	"where": [
-	// 		{
-	// 			"operator": "and",
-	// 			"condition": { "field": "age", "operator": ">=", "value": 30 }
-	// 		},
-	// 		{
-	// 			"operator": "and",
-	// 			"condition": { "field": "age", "operator": "<=", "value": 60 }
-	// 		},
-	// 		{
-	// 			"operator": "or",
-	// 			"condition": [
-	// 			{
-	// 				"operator": "and",
-	// 				"condition": { "field": "name", "operator": "startsWith", "value": "Matheus" }
-	// 			},
-	// 			{
-	// 				"operator": "or",
-	// 				"condition": { "field": "name", "operator": "endsWith", "value": "Caetano" }
-	// 			}
-	// 			]
-	// 		}
-	// 	]
-	// }
-	var body any
+	var body map[string]any
 	if err := c.ShouldBindJSON(&body); err != nil {
 		responses.BadRequest(c, err)
 		return
@@ -82,8 +58,7 @@ func (h *CompanyHandler) All(c *gin.Context) {
 
 	//? Where Conditions
 	var conditions []db.WhereLogicBlock
-	if where, ok := body.(map[string]any)["where"]; ok {
-
+	if where, ok := body["where"]; ok {
 		for _, whereItem := range where.([]interface{}) {
 			conditions = append(conditions, parseWhereCondition(whereItem) )
 		}
@@ -91,10 +66,10 @@ func (h *CompanyHandler) All(c *gin.Context) {
 
 	//? Sort By
 	var sortByDto []db.SortBy
-	sortByQuery := c.Query("sort_by")
-	
-	if sortByQuery != "" {
-		sortBy := strings.Split(sortByQuery, ",")
+	sortByQuery := body["sort_by"]
+
+	if sortByQuery != "" && sortByQuery != nil {
+		sortBy := strings.Split(sortByQuery.(string), ",")
 
 		for _, sort := range sortBy {
 			split := strings.Split(sort, ":")
@@ -110,10 +85,34 @@ func (h *CompanyHandler) All(c *gin.Context) {
 		}
 	}
 
-
 	//? Pagination Params
-	page, _ := strconv.Atoi(c.Query("page"))
-	perPage, _ := strconv.Atoi(c.Query("per_page"))
+	p := body["page"]
+	pp := body["per_page"]
+	var page, perPage int
+	if p != nil {
+		switch v := p.(type) {
+		case float64:
+			page = int(v)
+		case int:
+			page = v
+		case string:
+			if i, err := strconv.Atoi(v); err == nil {
+				page = i
+			}
+		}
+	}
+	if pp != nil {
+		switch v := pp.(type) {
+		case float64:
+			perPage = int(v)
+		case int:
+			perPage = v
+		case string:
+			if i, err := strconv.Atoi(v); err == nil {
+				perPage = i
+			}
+		}
+	}
 
 	//?When Listing all without pagination
 	if page == 0 && perPage == 0 {
@@ -153,19 +152,19 @@ func (h *CompanyHandler) Find(c *gin.Context) {
 	responses.Ok(c, company, nil)
 }
 
-// func (h *CompanyHandler) Create(c *gin.Context) {
-// 	var company models.Company
+func (h *CompanyHandler) Create(c *gin.Context) {
+	var company models.Company
 
-// 	if err := c.ShouldBindJSON(&company); err != nil {
-// 		responses.BadRequest(c, err)
-// 		return
-// 	}
+	if err := c.ShouldBindJSON(&company); err != nil {
+		responses.BadRequest(c, err)
+		return
+	}
 
-// 	err := h.service.Create(&company)
-// 	if err != nil {
-// 		responses.Error(c, err)
-// 		return
-// 	}
+	err := h.service.Create(&company)
+	if err != nil {
+		responses.Error(c, err)
+		return
+	}
 
-// 	responses.Ok(c, company, nil)
-// }
+	responses.Ok(c, company, nil)
+}
