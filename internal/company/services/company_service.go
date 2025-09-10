@@ -15,6 +15,7 @@ type CompanyService interface {
 	All(props dto.ListingProps) (*[]models.Company, *errs.Error)
 	Find(id int) (*models.Company, *errs.Error)
 	Create(company *models.Company) *errs.Error
+	Update(company *models.Company) *errs.Error
 }
 
 type companyService struct {
@@ -41,4 +42,9 @@ func (s *companyService) Create(company *models.Company) *errs.Error {
 	company.CreatedAt = time.Now()
 	company.UpdatedAt = company.CreatedAt
 	return s.repo.Create(company)
+}
+
+func (s *companyService) Update(company *models.Company) *errs.Error {
+	company.UpdatedAt = time.Now()
+	return s.repo.Update(company)
 }

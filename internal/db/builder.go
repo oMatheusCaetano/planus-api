@@ -281,13 +281,9 @@ func mapOperatorsToSql(operator string, value any) (string, any) {
 }
 
 
-//! WRITE
 
-type Body struct {
-    Key   string
-    Value any
-}
 
+//! INSERT
 type InsertQb struct {
     tableName    string
     columns     []string
@@ -345,6 +341,162 @@ func (q *InsertQb) Scan(dest ...any) *errs.Error {
 }
 
 func (q *InsertQb) Run() (*sql.Rows, *errs.Error) {
+    query, args := q.ToSql()
+    rows, err := con.Query(query, args...)
+    if err != nil {
+        return nil, errs.From(err)
+    }
+    return rows, nil
+}
+
+
+//! UPDATE
+type UpdateQb struct {
+    tableName string
+    sets      map[string]any
+    where     []WhereLogicBlock
+    returning []string
+}
+
+func Update(tableName string) *UpdateQb {
+    return &UpdateQb{
+        tableName: tableName,
+        sets:      make(map[string]any),
+    }
+}
+
+func (q *UpdateQb) Set(column string, value any) *UpdateQb {
+    q.sets[column] = value
+    return q
+}
+
+func (q *UpdateQb) WhereFromLogicBlock(blocks []WhereLogicBlock) *UpdateQb {
+    q.where = append(q.where, blocks...)
+    return q
+}
+
+func (q *UpdateQb) Where(column string, operator string, value any) *UpdateQb {
+    q.where = append(q.where, WhereLogicBlock{
+        Operator:  "and",
+        Condition: Where{Key: column, Operator: operator, Value: value},
+    })
+    return q
+}
+
+func (q *UpdateQb) Or(column string, operator string, value any) *UpdateQb {
+    q.where = append(q.where, WhereLogicBlock{
+        Operator:  "or",
+        Condition: Where{Key: column, Operator: operator, Value: value},
+    })
+    return q
+}
+
+func (q *UpdateQb) WhereSub(callback func (subQueryBuilder *SelectQb) *SelectQb) *UpdateQb {
+    subQb := callback(&SelectQb{})
+    q.where = append(q.where, WhereLogicBlock{
+        Operator:  "and",
+        Condition: subQb.where,
+    })
+    return q
+}
+
+func (q *UpdateQb) OrSub(callback func (subQueryBuilder *SelectQb) *SelectQb) *UpdateQb {
+    subQb := callback(&SelectQb{})
+    q.where = append(q.where, WhereLogicBlock{
+        Operator:  "or",
+        Condition: subQb.where,
+    })
+    return q
+}
+
+func (q *UpdateQb) Returning(columns ...string) *UpdateQb {
+    q.returning = columns
+    return q
+}
+
+func (q *UpdateQb) ToSql() (string, []any) {
+    var args []any
+    var setClauses []string
+
+    i := 1
+    for col, val := range q.sets {
+        args = append(args, val)
+        setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, i))
+        i++
+    }
+
+    query := fmt.Sprintf("UPDATE %s SET %s", q.tableName, strings.Join(setClauses, ", "))
+
+    if len(q.where) > 0 {
+        var processCondition func(cond interface{}) (string, error)
+        processCondition = func(cond interface{}) (string, error) {
+            switch c := cond.(type) {
+            case Where:
+                c.Operator, c.Value = mapOperatorsToSql(c.Operator, c.Value)
+                args = append(args, c.Value)
+                return fmt.Sprintf("%s %s $%d", c.Key, c.Operator, len(args)), nil
+            case WhereLogicBlock:
+                if logicCond, ok := c.Condition.([]WhereLogicBlock); ok {
+                    var subConditions []string
+                    for _, subCond := range logicCond {
+                        subCondStr, err := processCondition(subCond)
+                        if err != nil {
+                            return "", err
+                        }
+                        op := "AND"
+                        if subCond.Operator == "or" {
+                            op = "OR"
+                        }
+                        subConditions = append(subConditions, op + " " + subCondStr)
+                    }
+                    return "(" + strings.Join(subConditions, " ") + ")", nil
+                } else {
+                    return processCondition(c.Condition)
+                }
+            default:
+                return "", fmt.Errorf("invalid condition type")
+            }
+        }
+
+        var conditions []string
+
+        for _, block := range q.where {
+            condStr, err := processCondition(block)
+            if err != nil {
+                // Handle error appropriately, here we just return an empty query and args
+                return "", nil
+            }
+            op := "AND"
+            if block.Operator == "or" {
+                op = "OR"
+            }
+            conditions = append(conditions, op + " " + condStr)
+        }
+
+        condQuery := (" WHERE " + strings.Join(conditions, " "))
+        condQuery = strings.ReplaceAll(condQuery, "WHERE AND", "WHERE")
+        condQuery = strings.ReplaceAll(condQuery, "AND (AND", "AND (")
+        condQuery = strings.ReplaceAll(condQuery, "OR (AND", "OR (")
+        query += condQuery
+    }
+
+    if len(q.returning) > 0 {
+        query += fmt.Sprintf(" RETURNING %s", strings.Join(q.returning, ", "))
+    }
+
+    return query, args
+}
+
+func (q *UpdateQb) Scan(dest ...any) *errs.Error {
+    query, args := q.ToSql()
+    err := con.QueryRow(query, args...).Scan(dest...)
+    if err != nil {
+        return errs.From(err)
+    }
+    return nil
+}
+
+func (q *UpdateQb) Run() (*sql.Rows, *errs.Error) {
     query, args := q.ToSql()
     rows, err := con.Query(query, args...)
     if err != nil {

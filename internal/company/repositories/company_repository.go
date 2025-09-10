@@ -15,6 +15,7 @@ type CompanyRepository interface {
     All(props dto.ListingProps) (*[]models.Company, *errs.Error)
 	Find(id int) (*models.Company, *errs.Error)
     Create(company *models.Company) *errs.Error
+    Update(company *models.Company) *errs.Error
 }
 
 type companyRepository struct {
@@ -146,6 +147,21 @@ func (r *companyRepository) Create(company *models.Company) *errs.Error {
         }).
         Returning("id").
         Scan(&company.ID)
+
+    if err != nil {
+        return errs.From(err)
+    }
+    return nil
+}
+
+func (r *companyRepository) Update(company *models.Company) *errs.Error {
+    _, err := db.
+        Update("companies").
+        Set("name", company.Name).
+        Set("cnpj", company.CNPJ).
+        Set("updated_at", company.UpdatedAt).
+        Where("id", "=", company.ID).
+        Run()
 
     if err != nil {
         return errs.From(err)

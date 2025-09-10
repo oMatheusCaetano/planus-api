@@ -168,3 +168,23 @@ func (h *CompanyHandler) Create(c *gin.Context) {
 
 	responses.Ok(c, company, nil)
 }
+
+func (h *CompanyHandler) Update(c *gin.Context) {
+	var company models.Company
+
+	if err := c.ShouldBindJSON(&company); err != nil {
+		responses.BadRequest(c, err)
+		return
+	}
+
+	id, _ := strconv.Atoi(c.Param("id"))
+	company.ID = id
+
+	err := h.service.Update(&company)
+	if err != nil {
+		responses.Error(c, err)
+		return
+	}
+
+	responses.Ok(c, company, nil)
+}
