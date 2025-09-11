@@ -1,17 +1,16 @@
 package main
 
 import (
-	"github.com/omatheuscaetano/planus-api/internal/config"
-	"github.com/omatheuscaetano/planus-api/internal/db"
 	"github.com/omatheuscaetano/planus-api/internal/router"
-	"github.com/omatheuscaetano/planus-api/internal/shared/app"
-	"github.com/omatheuscaetano/planus-api/internal/shared/validators"
+	"github.com/omatheuscaetano/planus-api/pkg/app"
+	"github.com/omatheuscaetano/planus-api/pkg/db"
+	"github.com/omatheuscaetano/planus-api/pkg/validators"
 )
 
 func main() {
-	config.Init()
-	db.Init()
-	validators.Init()
-	r := router.Init()
-	r.Run(":" + app.ServerPort())
+    app.Init()
+    db.Init()
+    validators.Init()
+    r := router.Init()
+    r.Run(":" + app.ServerPort())
 }

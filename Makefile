@@ -6,7 +6,7 @@ endif
 
 # Variables
 DOCKER_EXEC_API = docker exec -it $(API_CONTAINER_NAME)
-MIGRATIONS_DIR = internal/db/migrations
+MIGRATIONS_DIR = database/migrations
 DB_CONNECTION_STRING = "user=$(DB_USER) password=$(DB_PASSWORD) host=$(DB_HOST) port=$(DB_CONTAINER_PORT) dbname=$(DB_NAME) sslmode=disable"
 
 # Commands
@@ -28,6 +28,8 @@ migration-create:
 migration-up:
 	$(DOCKER_EXEC_API) goose -dir $(MIGRATIONS_DIR) postgres $(DB_CONNECTION_STRING) up
 
+seed:
+	$(DOCKER_EXEC_API) go run cmd/seed/main.go
 
 %:
 	@:
