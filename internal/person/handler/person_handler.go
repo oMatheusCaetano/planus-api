@@ -17,8 +17,14 @@ func NewPersonHandler(service *service.PersonService) *PersonHandler {
 	return &PersonHandler{service: service}
 }
 
-func (h *PersonHandler) All(c *gin.Context) {
-	resources, appErr := h.service.All(c.Request.Context())
+func (h *PersonHandler) List(c *gin.Context) {
+	var dto dto.ListPerson
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		responses.BadRequest(c, err)
+		return
+	}
+
+	resources, appErr := h.service.All(c.Request.Context(), &dto)
 	if appErr != nil {
 		responses.Error(c, appErr)
 		return
@@ -44,7 +50,7 @@ func (h *PersonHandler) Find(c *gin.Context) {
 }
 
 func (h *PersonHandler) Create(c *gin.Context) {
-	var dto dto.CreatePersonDTO
+	var dto dto.CreatePerson
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		responses.BadRequest(c, err)
 		return
@@ -60,7 +66,7 @@ func (h *PersonHandler) Create(c *gin.Context) {
 }
 
 func (h *PersonHandler) Update(c *gin.Context) {
-	var dto dto.UpdatePersonDTO
+	var dto dto.UpdatePerson
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		responses.BadRequest(c, err)
 		return

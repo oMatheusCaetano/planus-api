@@ -3,9 +3,12 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/omatheuscaetano/planus-api/internal/person/dto"
 	"github.com/omatheuscaetano/planus-api/internal/person/model"
+	dbDto "github.com/omatheuscaetano/planus-api/pkg/db/dto"
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
 )
 
@@ -23,10 +26,113 @@ func NewPersonPgStore(db *sql.DB) *PersonPgStore {
 	}
 }
 
-func (r *PersonPgStore) All(ctx context.Context) ([]*model.Person, *errs.Error) {
+func whereLogic(query sq.SelectBuilder, block []*dbDto.WhereLogicBlock) sq.SelectBuilder {
+	if len(block) == 0 {
+		return query
+	}
+
+	sqlizer := buildWhereSqlizer(block)
+	if sqlizer != nil {
+		query = query.Where(sqlizer)
+	}
+
+	return query
+}
+
+// buildWhereSqlizer monta um sq.Sqlizer a partir dos blocos de where, respeitando
+// operadores OR — quando encontra um bloco com operator == "or" ele combina o
+// bloco atual com o anterior em um sq.Or{prev, current}. Os demais blocos são
+// deixados como partes separadas que serão ANDed no nível superior.
+func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
+	if len(block) == 0 {
+		return nil
+	}
+
+	var parts []sq.Sqlizer
+
+	for i, b := range block {
+		var expr sq.Sqlizer
+		if b.Condition != nil {
+			switch strings.ToUpper(b.Condition.Operator) {
+			case "=":
+				expr = sq.Eq{b.Condition.Key: b.Condition.Value}
+			case "!=":
+				expr = sq.NotEq{b.Condition.Key: b.Condition.Value}
+			case "<":
+				expr = sq.Lt{b.Condition.Key: b.Condition.Value}
+			case "<=":
+				expr = sq.LtOrEq{b.Condition.Key: b.Condition.Value}
+			case ">":
+				expr = sq.Gt{b.Condition.Key: b.Condition.Value}
+			case ">=":
+				expr = sq.GtOrEq{b.Condition.Key: b.Condition.Value}
+			case "LIKE":
+				expr = sq.Like{b.Condition.Key: b.Condition.Value}
+			case "ILIKE", "CONTAIN", "CONTAINS", "CONTAINING":
+				expr = sq.ILike{b.Condition.Key: b.Condition.Value}
+			case "STARTWITH", "STARTSWITH":
+				expr = sq.ILike{b.Condition.Key: b.Condition.Value.(string) + "%"}
+			case "ENDWITH", "ENDSWITH":
+				expr = sq.ILike{b.Condition.Key: "%" + b.Condition.Value.(string)}
+			case "IN":
+				expr = sq.Eq{b.Condition.Key: b.Condition.Value}
+			default:
+				continue
+			}
+		} else if b.Sub != nil {
+			expr = buildWhereSqlizer(b.Sub)
+			if expr == nil {
+				continue
+			}
+		} else {
+			continue
+		}
+
+		if i == 0 {
+			parts = append(parts, expr)
+			continue
+		}
+
+		op := strings.ToLower(b.Operator)
+		if op == "or" {
+			// combina com o anterior em um OR
+			prev := parts[len(parts)-1]
+			if prevOr, ok := prev.(sq.Or); ok {
+				parts[len(parts)-1] = sq.Or(append([]sq.Sqlizer(prevOr), expr))
+			} else {
+				parts[len(parts)-1] = sq.Or{prev, expr}
+			}
+		} else {
+			// AND (padrão): mantém como parte separada que será ANDed no topo
+			parts = append(parts, expr)
+		}
+	}
+
+	if len(parts) == 0 {
+		return nil
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return sq.And(parts)
+}
+
+func (r *PersonPgStore) All(ctx context.Context, dto *dto.ListPerson) ([]*model.Person, *errs.Error) {
 	query := r.psql.
 		Select("id", "name", "created_at", "updated_at").
 		From(r.tableName)
+		
+	query = whereLogic(query, dto.Where)
+
+	if len(dto.SortBy) > 0 {
+		for _, sort := range dto.SortBy {
+			direction := strings.ToUpper(sort.Direction)
+			if direction != "ASC" && direction != "DESC" {
+				direction = "ASC"
+			}
+			query = query.OrderBy(sort.Key + " " + direction)
+		}
+	}
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {

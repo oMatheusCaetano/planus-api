@@ -16,7 +16,7 @@ func Routes(r *gin.RouterGroup) {
 
 	personGroup := r.Group("/person")
 	{
-		personGroup.POST("/list", personHandler.All)
+		personGroup.POST("/list", personHandler.List)
 		personGroup.GET("/:id", personHandler.Find)
 		personGroup.POST("", personHandler.Create)
 		personGroup.PUT("/:id", personHandler.Update)
