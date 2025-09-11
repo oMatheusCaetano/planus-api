@@ -39,10 +39,6 @@ func whereLogic(query sq.SelectBuilder, block []*dbDto.WhereLogicBlock) sq.Selec
 	return query
 }
 
-// buildWhereSqlizer monta um sq.Sqlizer a partir dos blocos de where, respeitando
-// operadores OR — quando encontra um bloco com operator == "or" ele combina o
-// bloco atual com o anterior em um sq.Or{prev, current}. Os demais blocos são
-// deixados como partes separadas que serão ANDed no nível superior.
 func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
 	if len(block) == 0 {
 		return nil
@@ -95,7 +91,6 @@ func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
 
 		op := strings.ToLower(b.Operator)
 		if op == "or" {
-			// combina com o anterior em um OR
 			prev := parts[len(parts)-1]
 			if prevOr, ok := prev.(sq.Or); ok {
 				parts[len(parts)-1] = sq.Or(append([]sq.Sqlizer(prevOr), expr))
@@ -103,7 +98,6 @@ func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
 				parts[len(parts)-1] = sq.Or{prev, expr}
 			}
 		} else {
-			// AND (padrão): mantém como parte separada que será ANDed no topo
 			parts = append(parts, expr)
 		}
 	}
@@ -115,6 +109,70 @@ func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
 		return parts[0]
 	}
 	return sq.And(parts)
+}
+
+func (r *PersonPgStore) Paginate(ctx context.Context, props *dto.PaginatePerson) (*dto.PaginatedPerson, *errs.Error) {
+	if props.Page == 0 { props.Page = 1 }
+	if props.PerPage == 0 { props.PerPage = 10 }
+
+	var total int
+	countQuery := r.psql.Select("COUNT(1) AS total").From(r.tableName)
+	countQuery = whereLogic(countQuery, props.Where)
+
+	countSqlStr, countArgs, err := countQuery.ToSql()
+	if err != nil { return nil, errs.From(err) }
+	if err := r.db.QueryRowContext(ctx, countSqlStr, countArgs...).Scan(&total); err != nil {
+		return nil, errs.From(err)
+	}
+
+	query := r.psql.
+		Select("id", "name", "created_at", "updated_at").
+		From(r.tableName).
+		Limit(uint64(props.PerPage)).
+		Offset(uint64((props.Page - 1) * props.PerPage))
+	query = whereLogic(query, props.Where)
+
+	if len(props.SortBy) > 0 {
+		for _, sort := range props.SortBy {
+			direction := strings.ToUpper(sort.Direction)
+			if direction != "ASC" && direction != "DESC" {
+				direction = "ASC"
+			}
+			query = query.OrderBy(sort.Key + " " + direction)
+		}
+	} else {
+		query = query.OrderBy("id DESC")
+	}
+
+	sqlStr, args, err := query.ToSql()
+	if err != nil { return nil, errs.From(err) }
+
+	rows, err := r.db.QueryContext(ctx, sqlStr, args...)
+	if err != nil { return nil, errs.From(err) }
+	defer rows.Close()
+
+	var people []*model.Person
+	for rows.Next() {
+		var person model.Person
+		if err := rows.Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
+			return nil, errs.From(err)
+		}
+		people = append(people, &person)
+	}
+
+	if err := rows.Err(); err != nil { return nil, errs.From(err) }
+
+	return &dto.PaginatedPerson{
+		Data: people,
+		Meta: &dto.PaginatedPersonMeta{
+			Page:     props.Page,
+			PerPage:  props.PerPage,
+			LastPage: (total + props.PerPage - 1) / props.PerPage,
+			Total:    total,
+			SortBy:   props.SortBy,
+			Where:    props.Where,
+		},
+	}, nil
 }
 
 func (r *PersonPgStore) All(ctx context.Context, dto *dto.ListPerson) ([]*model.Person, *errs.Error) {
@@ -132,6 +190,8 @@ func (r *PersonPgStore) All(ctx context.Context, dto *dto.ListPerson) ([]*model.
 			}
 			query = query.OrderBy(sort.Key + " " + direction)
 		}
+	}  else {
+		query = query.OrderBy("id DESC")
 	}
 
 	sqlStr, args, err := query.ToSql()

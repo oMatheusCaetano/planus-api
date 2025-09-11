@@ -19,6 +19,10 @@ func NewPersonService(store store.PersonStore) *PersonService {
 	return &PersonService{store: store}
 }
 
+func (s *PersonService) Paginate(c context.Context, dto *dto.PaginatePerson) (*dto.PaginatedPerson, *errs.Error) {
+	return s.store.Paginate(c, dto)
+}
+
 func (s *PersonService) All(c context.Context, dto *dto.ListPerson) ([]*model.Person, *errs.Error) {
 	return s.store.All(c, dto)
 }

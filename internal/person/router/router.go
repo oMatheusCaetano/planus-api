@@ -16,6 +16,7 @@ func Routes(r *gin.RouterGroup) {
 
 	personGroup := r.Group("/person")
 	{
+		personGroup.POST("/paginate", personHandler.Paginate)
 		personGroup.POST("/list", personHandler.List)
 		personGroup.GET("/:id", personHandler.Find)
 		personGroup.POST("", personHandler.Create)

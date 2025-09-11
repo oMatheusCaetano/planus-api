@@ -17,6 +17,22 @@ func NewPersonHandler(service *service.PersonService) *PersonHandler {
 	return &PersonHandler{service: service}
 }
 
+func (h *PersonHandler) Paginate(c *gin.Context) {
+	var dto dto.PaginatePerson
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		responses.BadRequest(c, err)
+		return
+	}
+
+	resources, appErr := h.service.Paginate(c.Request.Context(), &dto)
+	if appErr != nil {
+		responses.Error(c, appErr)
+		return
+	}
+
+	responses.OkWithMeta(c, resources.Data, resources.Meta)
+}
+
 func (h *PersonHandler) List(c *gin.Context) {
 	var dto dto.ListPerson
 	if err := c.ShouldBindJSON(&dto); err != nil {
