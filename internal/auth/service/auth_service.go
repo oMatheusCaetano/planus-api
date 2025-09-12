@@ -63,6 +63,12 @@ func (s *AuthService) Login(c context.Context, dto *dto.Login) (*dto.LoginData, 
         return nil, err
     }
 
+    person, err := s.personStore.Find(c, user.ID)
+    if err != nil {
+        return nil, err
+    }
+
+    data.User = person
     return data, nil
 }
 
