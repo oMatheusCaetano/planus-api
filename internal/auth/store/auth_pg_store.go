@@ -45,9 +45,9 @@ func (s *AuthPgStore) FindUserByEmail(c context.Context , email string) (*model.
 func (s *AuthPgStore) CreateUser(c context.Context, dto *model.User) (*model.User, *errs.Error) {
     query := s.psql.
 		Insert(s.usersTable).
-		Columns("person_id", "email", "password", "created_at", "updated_at").
-		Values(dto.PersonID, dto.Email, dto.Password, dto.CreatedAt, dto.UpdatedAt).
-		Suffix("RETURNING id, person_id, email, password, created_at, updated_at")
+		Columns("id", "email", "password", "created_at", "updated_at").
+		Values(dto.ID, dto.Email, dto.Password, dto.CreatedAt, dto.UpdatedAt).
+		Suffix("RETURNING id, email, password, created_at, updated_at")
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *AuthPgStore) CreateUser(c context.Context, dto *model.User) (*model.Use
 	}
 
     var model model.User
-	if err := s.db.QueryRowContext(c, sqlStr, args...).Scan(&model.ID, &model.PersonID, &model.Email, &model.Password, &model.CreatedAt, &model.UpdatedAt); err != nil {
+	if err := s.db.QueryRowContext(c, sqlStr, args...).Scan(&model.ID, &model.Email, &model.Password, &model.CreatedAt, &model.UpdatedAt); err != nil {
 		return nil, errs.From(err)
 	}
 

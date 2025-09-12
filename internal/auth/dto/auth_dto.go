@@ -3,7 +3,7 @@ package dto
 import "github.com/omatheuscaetano/planus-api/internal/person/model"
 
 type CreateUser struct {
-    PersonID int    `json:"person_id" binding:"required,min=1"`
+    ID       int    `json:"id".       binding:"required,min=1"`
     Email    string `json:"email"     binding:"required,email,max=255"`
     Password string `json:"password"  binding:"required,min=8,max=100"`
 }

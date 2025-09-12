@@ -50,7 +50,7 @@ func (s *Seeder) CreatePerson(ctx context.Context, withUser bool) {
     }
 
     _, erru := s.authStore.CreateUser(ctx, &authModel.User{
-        PersonID:  person.ID,
+        ID:        person.ID,
         Email:     fake.Internet().Email(),
         Password:  string(hashedPassword),
         CreatedAt: time.Now(),

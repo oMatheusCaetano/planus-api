@@ -329,9 +329,9 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
         defer wg.Done()
 
         query := r.psql.
-            Select("id", "person_id", "email", "created_at", "updated_at").
+            Select("email", "created_at", "updated_at").
             From("users").
-            Where(sq.Eq{"person_id": id})
+            Where(sq.Eq{"id": id})
 
         sqlStr, args, err := query.ToSql()
         if err != nil {
@@ -340,9 +340,7 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
         }
 
         user := &userModel.User{}
-        if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(
-            &user.ID, &user.PersonID, &user.Email, &user.CreatedAt, &user.UpdatedAt,
-        ); err != nil {
+        if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(&user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
             resultCh <- findResult{err: errs.From(err)}
             return
         }
@@ -368,7 +366,6 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
             person = res.person
         }
         if res.user != nil {
-			// user.PersonID = id
             user = res.user
         }
     }

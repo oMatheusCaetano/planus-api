@@ -28,6 +28,9 @@ migration-create:
 migration-up:
 	$(DOCKER_EXEC_API) goose -dir $(MIGRATIONS_DIR) postgres $(DB_CONNECTION_STRING) up
 
+migration-down:
+	$(DOCKER_EXEC_API) goose -dir $(MIGRATIONS_DIR) postgres $(DB_CONNECTION_STRING) down
+
 seed:
 	$(DOCKER_EXEC_API) go run cmd/seed/main.go
 
