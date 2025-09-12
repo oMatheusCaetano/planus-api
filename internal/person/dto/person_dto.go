@@ -13,7 +13,6 @@ type PaginatePerson struct {
 }
 
 type PaginatedPersonMeta struct {
-    Time      string                 `json:"time"`
     Page      int                    `json:"page"`
     PerPage   int                    `json:"per_page"`
     LastPage  int                    `json:"last_page"`

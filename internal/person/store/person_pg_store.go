@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+	"sync"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/omatheuscaetano/planus-api/internal/person/dto"
@@ -112,55 +113,98 @@ func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
 }
 
 func (r *PersonPgStore) Paginate(ctx context.Context, props *dto.PaginatePerson) (*dto.PaginatedPerson, *errs.Error) {
-	if props.Page == 0 { props.Page = 1 }
-	if props.PerPage == 0 { props.PerPage = 10 }
-
-	var total int
-	countQuery := r.psql.Select("COUNT(1) AS total").From(r.tableName)
-	countQuery = whereLogic(countQuery, props.Where)
-
-	countSqlStr, countArgs, err := countQuery.ToSql()
-	if err != nil { return nil, errs.From(err) }
-	if err := r.db.QueryRowContext(ctx, countSqlStr, countArgs...).Scan(&total); err != nil {
-		return nil, errs.From(err)
+	if props.Page == 0 {
+		props.Page = 1
+	}
+	if props.PerPage == 0 {
+		props.PerPage = 10
 	}
 
-	query := r.psql.
-		Select("id", "name", "created_at", "updated_at").
-		From(r.tableName).
-		Limit(uint64(props.PerPage)).
-		Offset(uint64((props.Page - 1) * props.PerPage))
-	query = whereLogic(query, props.Where)
+	var (
+		total  int
+		people []*model.Person
+	)
 
-	if len(props.SortBy) > 0 {
-		for _, sort := range props.SortBy {
-			direction := strings.ToUpper(sort.Direction)
-			if direction != "ASC" && direction != "DESC" {
-				direction = "ASC"
+	errCh := make(chan *errs.Error, 2)
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	//! Count total records
+	go func() {
+		defer wg.Done()
+
+		countQuery := r.psql.Select("COUNT(1) AS total").From(r.tableName)
+		countQuery = whereLogic(countQuery, props.Where)
+
+		countSqlStr, countArgs, err := countQuery.ToSql()
+		if err != nil {
+			errCh <- errs.From(err)
+			return
+		}
+
+		if err := r.db.QueryRowContext(ctx, countSqlStr, countArgs...).Scan(&total); err != nil {
+			errCh <- errs.From(err)
+			return
+		}
+	}()
+
+	//! Fetch paginated records
+	go func() {
+		defer wg.Done()
+
+		query := r.psql.
+			Select("id", "name", "created_at", "updated_at").
+			From(r.tableName).
+			Limit(uint64(props.PerPage)).
+			Offset(uint64((props.Page - 1) * props.PerPage))
+		query = whereLogic(query, props.Where)
+
+		if len(props.SortBy) > 0 {
+			for _, sort := range props.SortBy {
+				direction := strings.ToUpper(sort.Direction)
+				if direction != "ASC" && direction != "DESC" {
+					direction = "ASC"
+				}
+				query = query.OrderBy(sort.Key + " " + direction)
 			}
-			query = query.OrderBy(sort.Key + " " + direction)
+		} else {
+			query = query.OrderBy("id DESC")
 		}
-	} else {
-		query = query.OrderBy("id DESC")
-	}
 
-	sqlStr, args, err := query.ToSql()
-	if err != nil { return nil, errs.From(err) }
-
-	rows, err := r.db.QueryContext(ctx, sqlStr, args...)
-	if err != nil { return nil, errs.From(err) }
-	defer rows.Close()
-
-	var people []*model.Person
-	for rows.Next() {
-		var person model.Person
-		if err := rows.Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
-			return nil, errs.From(err)
+		sqlStr, args, err := query.ToSql()
+		if err != nil {
+			errCh <- errs.From(err)
+			return
 		}
-		people = append(people, &person)
-	}
 
-	if err := rows.Err(); err != nil { return nil, errs.From(err) }
+		rows, err := r.db.QueryContext(ctx, sqlStr, args...)
+		if err != nil {
+			errCh <- errs.From(err)
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var person model.Person
+			if err := rows.Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
+				errCh <- errs.From(err)
+				return
+			}
+			people = append(people, &person)
+		}
+
+		if err := rows.Err(); err != nil {
+			errCh <- errs.From(err)
+			return
+		}
+	}()
+
+	wg.Wait()
+	close(errCh)
+
+	if len(errCh) > 0 {
+		return nil, <-errCh
+	}
 
 	return &dto.PaginatedPerson{
 		Data: people,
