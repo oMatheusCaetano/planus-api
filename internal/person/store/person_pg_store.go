@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	sq "github.com/Masterminds/squirrel"
+	userModel "github.com/omatheuscaetano/planus-api/internal/auth/model"
 	"github.com/omatheuscaetano/planus-api/internal/person/dto"
 	"github.com/omatheuscaetano/planus-api/internal/person/model"
 	dbDto "github.com/omatheuscaetano/planus-api/pkg/db/dto"
@@ -120,38 +121,40 @@ func (r *PersonPgStore) Paginate(ctx context.Context, props *dto.PaginatePerson)
 		props.PerPage = 10
 	}
 
-	var (
+	type paginateResult struct {
 		total  int
 		people []*model.Person
-	)
+		err    *errs.Error
+	}
 
-	errCh := make(chan *errs.Error, 2)
+	resultCh := make(chan paginateResult, 2)
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
-	//! Count total records
+	// Contagem total
 	go func() {
 		defer wg.Done()
-
 		countQuery := r.psql.Select("COUNT(1) AS total").From(r.tableName)
 		countQuery = whereLogic(countQuery, props.Where)
 
 		countSqlStr, countArgs, err := countQuery.ToSql()
 		if err != nil {
-			errCh <- errs.From(err)
+			resultCh <- paginateResult{err: errs.From(err)}
 			return
 		}
 
+		var total int
 		if err := r.db.QueryRowContext(ctx, countSqlStr, countArgs...).Scan(&total); err != nil {
-			errCh <- errs.From(err)
+			resultCh <- paginateResult{err: errs.From(err)}
 			return
 		}
+
+		resultCh <- paginateResult{total: total}
 	}()
 
-	//! Fetch paginated records
+	// Fetch de registros
 	go func() {
 		defer wg.Done()
-
 		query := r.psql.
 			Select("id", "name", "created_at", "updated_at").
 			From(r.tableName).
@@ -173,37 +176,56 @@ func (r *PersonPgStore) Paginate(ctx context.Context, props *dto.PaginatePerson)
 
 		sqlStr, args, err := query.ToSql()
 		if err != nil {
-			errCh <- errs.From(err)
+			resultCh <- paginateResult{err: errs.From(err)}
 			return
 		}
 
 		rows, err := r.db.QueryContext(ctx, sqlStr, args...)
 		if err != nil {
-			errCh <- errs.From(err)
+			resultCh <- paginateResult{err: errs.From(err)}
 			return
 		}
 		defer rows.Close()
 
+		var people []*model.Person
 		for rows.Next() {
 			var person model.Person
 			if err := rows.Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
-				errCh <- errs.From(err)
+				resultCh <- paginateResult{err: errs.From(err)}
 				return
 			}
 			people = append(people, &person)
 		}
 
 		if err := rows.Err(); err != nil {
-			errCh <- errs.From(err)
+			resultCh <- paginateResult{err: errs.From(err)}
 			return
 		}
+
+		resultCh <- paginateResult{people: people}
 	}()
 
-	wg.Wait()
-	close(errCh)
+	// Goroutine fechadora do canal
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
 
-	if len(errCh) > 0 {
-		return nil, <-errCh
+	var (
+		total  int
+		people []*model.Person
+	)
+
+	for res := range resultCh {
+		if res.err != nil {
+			return nil, res.err
+		}
+		if res.total != 0 {
+			total = res.total
+		}
+		if res.people != nil {
+			people = res.people
+		}
 	}
 
 	return &dto.PaginatedPerson{
@@ -266,22 +288,96 @@ func (r *PersonPgStore) All(ctx context.Context, dto *dto.ListPerson) ([]*model.
 }
 
 func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.Error) {
-	query := r.psql.
-		Select("id", "name", "created_at", "updated_at").
-		From(r.tableName).
-		Where(sq.Eq{"id": id})
-
-	sqlStr, args, err := query.ToSql()
-	if err != nil {
-		return nil, errs.From(err)
+	type findResult struct {
+		person *model.Person
+		user   *userModel.User
+		err    *errs.Error
 	}
 
-	var person model.Person
-	if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
-		return nil, errs.From(err)
-	}
+    resultCh := make(chan findResult, 2)
+    wg := sync.WaitGroup{}
+    wg.Add(2)
 
-	return &person, nil
+    //! Fetch person
+    go func() {
+        defer wg.Done()
+
+        query := r.psql.
+            Select("id", "name", "created_at", "updated_at").
+            From(r.tableName).
+            Where(sq.Eq{"id": id})
+
+        sqlStr, args, err := query.ToSql()
+        if err != nil {
+            resultCh <- findResult{err: errs.From(err)}
+            return
+        }
+
+        person := &model.Person{}
+        if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(
+            &person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt,
+        ); err != nil {
+            resultCh <- findResult{err: errs.From(err)}
+            return
+        }
+
+        resultCh <- findResult{person: person}
+    }()
+
+    //! Fetch associated user
+    go func() {
+        defer wg.Done()
+
+        query := r.psql.
+            Select("id", "person_id", "email", "created_at", "updated_at").
+            From("users").
+            Where(sq.Eq{"person_id": id})
+
+        sqlStr, args, err := query.ToSql()
+        if err != nil {
+            resultCh <- findResult{err: errs.From(err)}
+            return
+        }
+
+        user := &userModel.User{}
+        if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(
+            &user.ID, &user.PersonID, &user.Email, &user.CreatedAt, &user.UpdatedAt,
+        ); err != nil {
+            resultCh <- findResult{err: errs.From(err)}
+            return
+        }
+
+        resultCh <- findResult{user: user}
+    }()
+
+    go func() {
+        wg.Wait()
+        close(resultCh)
+    }()
+
+    var (
+        person *model.Person
+        user   *userModel.User
+    )
+
+    for res := range resultCh {
+        if res.err != nil {
+            return nil, res.err
+        }
+        if res.person != nil {
+            person = res.person
+        }
+        if res.user != nil {
+			// user.PersonID = id
+            user = res.user
+        }
+    }
+
+    if person != nil {
+        person.User = user
+    }
+
+    return person, nil
 }
 
 func (r *PersonPgStore) Create(ctx context.Context, model *model.Person) (*model.Person, *errs.Error) {
