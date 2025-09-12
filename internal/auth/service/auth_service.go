@@ -37,10 +37,14 @@ func (s *AuthService) generateJWT(user *model.User) (*dto.LoginData, *errs.Error
         ExpiresIn: time.Now().Add(24 * time.Hour * 7).Unix(),
     }
 
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-        "sub": user.ID,
-        "exp": loginData.ExpiresIn,
-    })
+    claims := dto.JWTClaims{
+        Sub: user.ID,
+        RegisteredClaims: jwt.RegisteredClaims{
+            ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+        },
+    }
+
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
     tokenString, err := token.SignedString([]byte(app.JWTSecret()))
     if err != nil {

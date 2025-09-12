@@ -13,8 +13,8 @@ import (
 type ApiJSONResponse struct {
     Code      int         `json:"code"`
     Message   string      `json:"message"`
-    IsError   bool        `json:"isError"`
-    IsSuccess bool        `json:"isSuccess"`
+    IsError   bool        `json:"is_error"`
+    IsSuccess bool        `json:"is_success"`
     Data      any         `json:"data,omitempty"`
     Meta      any         `json:"meta,omitempty"`
 }
@@ -40,6 +40,11 @@ func JSONReturn(code int, message string, payload any, meta any) *ApiJSONRespons
 	}
 }
 
+func Abort(c *gin.Context, code int, message string, payload any, meta any) {
+    response := JSONReturn(code, message, payload, meta)
+	c.AbortWithStatusJSON(response.Code, response)
+}
+
 func JSON(c *gin.Context, code int, message string, payload any, meta any) {
     response := JSONReturn(code, message, payload, meta)
 	c.JSON(response.Code, response)
@@ -47,11 +52,11 @@ func JSON(c *gin.Context, code int, message string, payload any, meta any) {
 
 func Error(c *gin.Context, err error) {
     apiError := errs.From(err)
-    JSON(c, apiError.Code, apiError.Message, nil, nil)
+    Abort(c, apiError.Code, apiError.Message, nil, nil)
 }
 
 func BadRequest(c *gin.Context, err error) {
-	JSON(c, http.StatusBadRequest, err.Error(), translateValidationErrors(err), nil)
+	Abort(c, http.StatusBadRequest, err.Error(), translateValidationErrors(err), nil)
 }
 
 func Ok(c *gin.Context, payload any) {

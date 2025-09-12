@@ -1,6 +1,9 @@
 package dto
 
-import "github.com/omatheuscaetano/planus-api/internal/person/model"
+import (
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/omatheuscaetano/planus-api/internal/person/model"
+)
 
 type CreateUser struct {
     ID       int    `json:"id".       binding:"required,min=1"`
@@ -17,4 +20,9 @@ type LoginData struct {
     Token     string         `json:"token"`
     ExpiresIn int64          `json:"expires_in"`
     User      *model.Person  `json:"user"`
+}
+
+type JWTClaims struct {
+    Sub int `json:"sub"`
+    jwt.RegisteredClaims
 }

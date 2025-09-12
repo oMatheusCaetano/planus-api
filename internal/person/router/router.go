@@ -2,6 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	middlewares "github.com/omatheuscaetano/planus-api/internal/auth/middleware"
 	"github.com/omatheuscaetano/planus-api/internal/person/handler"
 	"github.com/omatheuscaetano/planus-api/internal/person/service"
 	"github.com/omatheuscaetano/planus-api/internal/person/store"
@@ -16,7 +17,7 @@ func Routes(r *gin.RouterGroup) {
 
 	personGroup := r.Group("/person")
 	{
-		personGroup.POST("/paginate", personHandler.Paginate)
+		personGroup.POST("/paginate", middlewares.JWT(), personHandler.Paginate)
 		personGroup.POST("/list", personHandler.List)
 		personGroup.GET("/:id", personHandler.Find)
 		personGroup.POST("", personHandler.Create)

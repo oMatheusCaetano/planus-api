@@ -9,6 +9,7 @@ import (
 
 type AppContext struct {
 	context.Context
+	UserID int
 }
 
 func Init() error {

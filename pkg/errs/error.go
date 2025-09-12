@@ -7,9 +7,20 @@ type Error struct {
     Message string
 }
 
+func New(code int, message string) *Error {
+    return &Error{Code:    code, Message: message}
+}
+
 func (err *Error) Error() string {
     return err.Message
 }
+
+func Unauthorized() *Error {
+    return &Error{
+        Code:    http.StatusUnauthorized,
+        Message: "Você precisa estar logado para realizar esta ação",
+    }
+} 
 
 func InvalidCredentials() *Error {
     return &Error{
