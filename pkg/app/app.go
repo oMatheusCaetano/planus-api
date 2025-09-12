@@ -33,6 +33,10 @@ func ServerPort() string {
 	return os.Getenv("API_PORT")
 }
 
+func JWTSecret() string {
+	return os.Getenv("JWT_SECRET")
+}
+
 func DBHost() string {
 	return os.Getenv("DB_HOST")
 }

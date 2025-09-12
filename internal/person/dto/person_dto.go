@@ -7,12 +7,13 @@ import (
 
 type PaginatePerson struct {
     Page    int                    `json:"page"    binding:"omitempty,min=1"`
-    PerPage int                    `json:"per_page" binding:"omitempty,min=1,max=100"`
+    PerPage int                    `json:"per_page" binding:"omitempty,min=1"`
     SortBy  []*dto.SortBy          `json:"sort_by" binding:"omitempty,dive"`
     Where   []*dto.WhereLogicBlock `json:"where"   binding:"omitempty,dive"`
 }
 
 type PaginatedPersonMeta struct {
+    Time      string                 `json:"time"`
     Page      int                    `json:"page"`
     PerPage   int                    `json:"per_page"`
     LastPage  int                    `json:"last_page"`

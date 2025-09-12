@@ -11,6 +11,13 @@ func (err *Error) Error() string {
     return err.Message
 }
 
+func InvalidCredentials() *Error {
+    return &Error{
+        Code:    http.StatusUnauthorized,
+        Message: "Credenciais inválidas",
+    }
+}
+
 func NotFound(message string) *Error {
     return &Error{
         Code:    http.StatusNotFound,

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	person "github.com/omatheuscaetano/planus-api/internal/person/router"
+	auth "github.com/omatheuscaetano/planus-api/internal/auth/router"
 	"github.com/omatheuscaetano/planus-api/pkg/app"
 	"github.com/omatheuscaetano/planus-api/pkg/middlewares"
 	"github.com/omatheuscaetano/planus-api/pkg/responses"
@@ -26,4 +27,5 @@ func initRoutes(r *gin.Engine) {
 	})
 
 	person.Routes(apiRoutes)
+	auth.Routes(apiRoutes)
 }
