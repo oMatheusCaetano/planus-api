@@ -1,4 +1,4 @@
-package auth
+package middleware
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ import (
 	"github.com/omatheuscaetano/planus-api/pkg/responses"
 )
 
-func JWT() gin.HandlerFunc {
+func JWTMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
         authHeader := c.GetHeader("Authorization")
 
@@ -47,7 +47,7 @@ func JWT() gin.HandlerFunc {
         }
 
         if appCtx, ok := c.Request.Context().(*app.AppContext); ok {
-            appCtx.UserID = claims.Sub
+            appCtx.UserID = &claims.Sub
         }
 
         c.Next()

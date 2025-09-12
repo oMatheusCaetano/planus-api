@@ -26,3 +26,9 @@ type JWTClaims struct {
     Sub int `json:"sub"`
     jwt.RegisteredClaims
 }
+
+type P struct {
+    UserId int
+    Module string
+    Action string
+}

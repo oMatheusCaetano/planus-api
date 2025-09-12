@@ -9,7 +9,7 @@ import (
 
 type AppContext struct {
 	context.Context
-	UserID int
+	UserID *int
 }
 
 func Init() error {
