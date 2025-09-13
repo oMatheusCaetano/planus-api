@@ -7,7 +7,7 @@ import (
 
 func AppContextMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
-        appCtx := &app.AppContext{
+        appCtx := &app.Context{
             Context:  c.Request.Context(),
         }
 

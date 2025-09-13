@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"strings"
 	"time"
 
@@ -55,7 +54,7 @@ func (s *AuthService) generateJWT(user *model.User) (*dto.LoginData, *errs.Error
     return loginData, nil
 }
 
-func (s *AuthService) Login(c context.Context, dto *dto.Login) (*dto.LoginData, *errs.Error) {
+func (s *AuthService) Login(c app.Context, dto *dto.Login) (*dto.LoginData, *errs.Error) {
     user, _ := s.store.FindUserByEmail(c, strings.ToLower(strings.TrimSpace(dto.Email)))
 
     if s.validateCredentials(user, dto.Password) != nil {
@@ -76,7 +75,7 @@ func (s *AuthService) Login(c context.Context, dto *dto.Login) (*dto.LoginData, 
     return data, nil
 }
 
-func (s *AuthService) Create(c context.Context, dto *dto.CreateUser) (*model.User, *errs.Error) {
+func (s *AuthService) Create(c app.Context, dto *dto.CreateUser) (*model.User, *errs.Error) {
     hashedPassword, err := bcrypt.GenerateFromPassword([]byte(dto.Password), bcrypt.DefaultCost)
     if err != nil {
         return nil, errs.From(err)

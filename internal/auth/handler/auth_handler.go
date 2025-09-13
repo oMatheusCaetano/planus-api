@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/auth/dto"
 	"github.com/omatheuscaetano/planus-api/internal/auth/service"
+	"github.com/omatheuscaetano/planus-api/pkg/app"
 	"github.com/omatheuscaetano/planus-api/pkg/responses"
 )
 
@@ -22,7 +23,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
         return
     }
 
-    response, err := h.service.Login(c.Request.Context(), &dto)
+    response, err := h.service.Login(c.Request.Context().(app.Context), &dto)
     if err != nil {
         responses.Error(c, err)
         return

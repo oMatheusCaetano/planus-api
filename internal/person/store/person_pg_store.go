@@ -3,20 +3,18 @@ package store
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"sync"
 
 	sq "github.com/Masterminds/squirrel"
 	userModel "github.com/omatheuscaetano/planus-api/internal/auth/model"
-	"github.com/omatheuscaetano/planus-api/internal/person/dto"
 	"github.com/omatheuscaetano/planus-api/internal/person/model"
 	dbDto "github.com/omatheuscaetano/planus-api/pkg/db/dto"
+	"github.com/omatheuscaetano/planus-api/pkg/db/function"
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
 )
 
 type PersonPgStore struct {
 	db        *sql.DB
-	psql      sq.StatementBuilderType
 	tableName string
 }
 
@@ -24,270 +22,46 @@ func NewPersonPgStore(db *sql.DB) *PersonPgStore {
 	return &PersonPgStore{
 		db:        db,
 		tableName: "people",
-		psql:      sq.StatementBuilder.PlaceholderFormat(sq.Dollar),
 	}
 }
 
-func whereLogic(query sq.SelectBuilder, block []*dbDto.WhereLogicBlock) sq.SelectBuilder {
-	if len(block) == 0 {
-		return query
-	}
-
-	sqlizer := buildWhereSqlizer(block)
-	if sqlizer != nil {
-		query = query.Where(sqlizer)
-	}
-
-	return query
-}
-
-func buildWhereSqlizer(block []*dbDto.WhereLogicBlock) sq.Sqlizer {
-	if len(block) == 0 {
-		return nil
-	}
-
-	var parts []sq.Sqlizer
-
-	for i, b := range block {
-		var expr sq.Sqlizer
-		if b.Condition != nil {
-			switch strings.ToUpper(b.Condition.Operator) {
-			case "=":
-				expr = sq.Eq{b.Condition.Key: b.Condition.Value}
-			case "!=":
-				expr = sq.NotEq{b.Condition.Key: b.Condition.Value}
-			case "<":
-				expr = sq.Lt{b.Condition.Key: b.Condition.Value}
-			case "<=":
-				expr = sq.LtOrEq{b.Condition.Key: b.Condition.Value}
-			case ">":
-				expr = sq.Gt{b.Condition.Key: b.Condition.Value}
-			case ">=":
-				expr = sq.GtOrEq{b.Condition.Key: b.Condition.Value}
-			case "LIKE":
-				expr = sq.Like{b.Condition.Key: b.Condition.Value}
-			case "ILIKE", "CONTAIN", "CONTAINS", "CONTAINING":
-				expr = sq.ILike{b.Condition.Key: b.Condition.Value}
-			case "STARTWITH", "STARTSWITH":
-				expr = sq.ILike{b.Condition.Key: b.Condition.Value.(string) + "%"}
-			case "ENDWITH", "ENDSWITH":
-				expr = sq.ILike{b.Condition.Key: "%" + b.Condition.Value.(string)}
-			case "IN":
-				expr = sq.Eq{b.Condition.Key: b.Condition.Value}
-			default:
-				continue
-			}
-		} else if b.Sub != nil {
-			expr = buildWhereSqlizer(b.Sub)
-			if expr == nil {
-				continue
-			}
-		} else {
-			continue
-		}
-
-		if i == 0 {
-			parts = append(parts, expr)
-			continue
-		}
-
-		op := strings.ToLower(b.Operator)
-		if op == "or" {
-			prev := parts[len(parts)-1]
-			if prevOr, ok := prev.(sq.Or); ok {
-				parts[len(parts)-1] = sq.Or(append([]sq.Sqlizer(prevOr), expr))
-			} else {
-				parts[len(parts)-1] = sq.Or{prev, expr}
-			}
-		} else {
-			parts = append(parts, expr)
-		}
-	}
-
-	if len(parts) == 0 {
-		return nil
-	}
-	if len(parts) == 1 {
-		return parts[0]
-	}
-	return sq.And(parts)
-}
-
-func (r *PersonPgStore) Paginate(ctx context.Context, props *dto.PaginatePerson) (*dto.PaginatedPerson, *errs.Error) {
-	if props.Page == 0 {
-		props.Page = 1
-	}
-	if props.PerPage == 0 {
-		props.PerPage = 10
-	}
-
-	type paginateResult struct {
-		total  int
-		people []*model.Person
-		err    *errs.Error
-	}
-
-	resultCh := make(chan paginateResult, 2)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	// Contagem total
-	go func() {
-		defer wg.Done()
-		countQuery := r.psql.Select("COUNT(1) AS total").From(r.tableName)
-		countQuery = whereLogic(countQuery, props.Where)
-
-		countSqlStr, countArgs, err := countQuery.ToSql()
-		if err != nil {
-			resultCh <- paginateResult{err: errs.From(err)}
-			return
-		}
-
-		var total int
-		if err := r.db.QueryRowContext(ctx, countSqlStr, countArgs...).Scan(&total); err != nil {
-			resultCh <- paginateResult{err: errs.From(err)}
-			return
-		}
-
-		resultCh <- paginateResult{total: total}
-	}()
-
-	// Fetch de registros
-	go func() {
-		defer wg.Done()
-		query := r.psql.
-			Select("id", "name", "created_at", "updated_at").
-			From(r.tableName).
-			Limit(uint64(props.PerPage)).
-			Offset(uint64((props.Page - 1) * props.PerPage))
-		query = whereLogic(query, props.Where)
-
-		if len(props.SortBy) > 0 {
-			for _, sort := range props.SortBy {
-				direction := strings.ToUpper(sort.Direction)
-				if direction != "ASC" && direction != "DESC" {
-					direction = "ASC"
-				}
-				query = query.OrderBy(sort.Key + " " + direction)
-			}
-		} else {
-			query = query.OrderBy("id DESC")
-		}
-
-		sqlStr, args, err := query.ToSql()
-		if err != nil {
-			resultCh <- paginateResult{err: errs.From(err)}
-			return
-		}
-
-		rows, err := r.db.QueryContext(ctx, sqlStr, args...)
-		if err != nil {
-			resultCh <- paginateResult{err: errs.From(err)}
-			return
-		}
-		defer rows.Close()
-
-		var people []*model.Person
-		for rows.Next() {
-			var person model.Person
-			if err := rows.Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
-				resultCh <- paginateResult{err: errs.From(err)}
-				return
-			}
-			people = append(people, &person)
-		}
-
-		if err := rows.Err(); err != nil {
-			resultCh <- paginateResult{err: errs.From(err)}
-			return
-		}
-
-		resultCh <- paginateResult{people: people}
-	}()
-
-	// Goroutine fechadora do canal
-	go func() {
-		wg.Wait()
-		close(resultCh)
-	}()
-
-	var (
-		total  int
-		people []*model.Person
-	)
-
-	for res := range resultCh {
-		if res.err != nil {
-			return nil, res.err
-		}
-		if res.total != 0 {
-			total = res.total
-		}
-		if res.people != nil {
-			people = res.people
-		}
-	}
-
-	return &dto.PaginatedPerson{
-		Data: people,
-		Meta: &dto.PaginatedPersonMeta{
-			Page:     props.Page,
-			PerPage:  props.PerPage,
-			LastPage: (total + props.PerPage - 1) / props.PerPage,
-			Total:    total,
-			SortBy:   props.SortBy,
-			Where:    props.Where,
+func (r *PersonPgStore) Paginate(ctx context.Context, props *dbDto.Paginate) (*dbDto.PaginatedData[model.Person], *errs.Error) {
+	return function.Paginate(ctx, &function.PaginateProps[model.Person]{
+		DB:        r.db,
+		Props:     props,
+		TableName: r.tableName,
+		Select: func() []string {
+			return []string{"id", "name", "created_at", "updated_at"}
 		},
-	}, nil
-}
-
-func (r *PersonPgStore) All(ctx context.Context, dto *dto.ListPerson) ([]*model.Person, *errs.Error) {
-	query := r.psql.
-		Select("id", "name", "created_at", "updated_at").
-		From(r.tableName)
-		
-	query = whereLogic(query, dto.Where)
-
-	if len(dto.SortBy) > 0 {
-		for _, sort := range dto.SortBy {
-			direction := strings.ToUpper(sort.Direction)
-			if direction != "ASC" && direction != "DESC" {
-				direction = "ASC"
+		Scan: func(rows *sql.Rows) (*model.Person, *errs.Error) {
+			var model model.Person
+			if err := rows.Scan(&model.ID, &model.Name, &model.CreatedAt, &model.UpdatedAt); err != nil {
+				return nil, errs.From(err)
 			}
-			query = query.OrderBy(sort.Key + " " + direction)
-		}
-	}  else {
-		query = query.OrderBy("id DESC")
-	}
-
-	sqlStr, args, err := query.ToSql()
-	if err != nil {
-		return nil, errs.From(err)
-	}
-
-	rows, err := r.db.QueryContext(ctx, sqlStr, args...)
-	if err != nil {
-		return nil, errs.From(err)
-	}
-	defer rows.Close()
-
-	var people []*model.Person
-	for rows.Next() {
-		var person model.Person
-		if err := rows.Scan(&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt); err != nil {
-			return nil, errs.From(err)
-		}
-		people = append(people, &person)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.From(err)
-	}
-
-	return people, nil
+			return &model, nil
+		},
+	})
 }
 
-func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.Error) {
+func (r *PersonPgStore) All(c context.Context, props *dbDto.List) ([]*model.Person, *errs.Error) {
+	return function.All(c, &function.AllProps[model.Person]{
+		DB:        r.db,
+		Props:     props,
+		TableName: r.tableName,
+		Select: func() []string {
+			return []string{"id", "name", "created_at", "updated_at"}
+		},
+		Scan: func(rows *sql.Rows) (*model.Person, *errs.Error) {
+			var model model.Person
+			if err := rows.Scan(&model.ID, &model.Name, &model.CreatedAt, &model.UpdatedAt); err != nil {
+				return nil, errs.From(err)
+			}
+			return &model, nil
+		},
+	})
+}
+
+func (r *PersonPgStore) Find(c context.Context, id int) (*model.Person, *errs.Error) {
 	type findResult struct {
 		person *model.Person
 		user   *userModel.User
@@ -302,7 +76,7 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
     go func() {
         defer wg.Done()
 
-        query := r.psql.
+        query := function.QueryBuilder().
             Select("id", "name", "created_at", "updated_at").
             From(r.tableName).
             Where(sq.Eq{"id": id})
@@ -314,7 +88,7 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
         }
 
         person := &model.Person{}
-        if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(
+        if err := r.db.QueryRowContext(c, sqlStr, args...).Scan(
             &person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt,
         ); err != nil {
             resultCh <- findResult{err: errs.From(err)}
@@ -328,7 +102,7 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
     go func() {
         defer wg.Done()
 
-        query := r.psql.
+        query := function.QueryBuilder().
             Select("email", "created_at", "updated_at").
             From("users").
             Where(sq.Eq{"id": id})
@@ -340,7 +114,7 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
         }
 
         user := &userModel.User{}
-        if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(&user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
+        if err := r.db.QueryRowContext(c, sqlStr, args...).Scan(&user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
             resultCh <- findResult{err: errs.From(err)}
             return
         }
@@ -377,59 +151,62 @@ func (r *PersonPgStore) Find(ctx context.Context, id int) (*model.Person, *errs.
     return person, nil
 }
 
-func (r *PersonPgStore) Create(ctx context.Context, model *model.Person) (*model.Person, *errs.Error) {
-	query := r.psql.
-		Insert(r.tableName).
-		Columns("name", "created_at", "updated_at").
-		Values(model.Name, model.CreatedAt, model.UpdatedAt).
-		Suffix("RETURNING id, name, created_at, updated_at")
+func (r *PersonPgStore) Create(c context.Context, model *model.Person) (*model.Person, *errs.Error) {
+	err := function.Create(c, &function.CreateProps{
+		DB: 	   r.db,
+		TableName: r.tableName,
+		Columns: func() []string {
+			return []string{"name", "created_at", "updated_at"}
+		},
+		Values: func() []any {
+			return []any{model.Name, model.CreatedAt, model.UpdatedAt}
+		},
+		Returning: func() []string {
+			return []string{"id", "name", "created_at", "updated_at"}
+		},
+		Scan: func() []any {
+			return []any{&model.ID, &model.Name, &model.CreatedAt, &model.UpdatedAt}
+		},
+	})
 
-	sqlStr, args, err := query.ToSql()
 	if err != nil {
-		return nil, errs.From(err)
-	}
-
-	if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(&model.ID, &model.Name, &model.CreatedAt, &model.UpdatedAt); err != nil {
-		return nil, errs.From(err)
+		return nil, err
 	}
 
 	return model, nil
 }
 
-func (r *PersonPgStore) Update(ctx context.Context, id int, model *model.Person) (*model.Person, *errs.Error) {
-	query := r.psql.
-		Update(r.tableName).
-		Set("name", model.Name).
-		Set("updated_at", model.UpdatedAt).
-		Where(sq.Eq{"id": id}).
-		Suffix("RETURNING id, name, created_at, updated_at")
+func (r *PersonPgStore) Update(c context.Context, id int, model *model.Person) (*model.Person, *errs.Error) {
+	err := function.Update(c, &function.UpdateProps{
+		DB:        r.db,
+		TableName: r.tableName,
+		Set: func(b sq.UpdateBuilder) sq.UpdateBuilder {
+			return b.Set("name", model.Name).Set("updated_at", model.UpdatedAt)
+		},
+		Where: func(b sq.UpdateBuilder) sq.UpdateBuilder {
+			return b.Where(sq.Eq{"id": id})
+		},
+		Returning: func() []string {
+			return []string{"id", "name", "created_at", "updated_at"}
+		},
+		Scan: func() []any {
+			return []any{&model.ID, &model.Name, &model.CreatedAt, &model.UpdatedAt}
+		},
+	})
 
-	sqlStr, args, err := query.ToSql()
-	if err != nil {
-		return nil, errs.From(err)
-	}
-
-	if err := r.db.QueryRowContext(ctx, sqlStr, args...).Scan(&model.ID, &model.Name, &model.CreatedAt, &model.UpdatedAt); err != nil {
-		return nil, errs.From(err)
+	if (err != nil) {
+		return nil, err
 	}
 
 	return model, nil
 }
 
-func (r *PersonPgStore) Delete(ctx context.Context, id int) *errs.Error {
-	query := r.psql.
-		Delete(r.tableName).
-		Where(sq.Eq{"id": id})
-
-	sqlStr, args, err := query.ToSql()
-	if err != nil {
-		return errs.From(err)
-	}
-
-	_, err = r.db.ExecContext(ctx, sqlStr, args...)
-	if err != nil {
-		return errs.From(err)
-	}
-
-	return nil
+func (r *PersonPgStore) Delete(c context.Context, id int) *errs.Error {
+	return function.Delete(c, &function.DeleteProps{
+        DB:        r.db,
+        TableName: r.tableName,
+        Where: func (qb sq.DeleteBuilder) sq.DeleteBuilder {
+            return qb.Where(sq.Eq{"id": id})
+        },
+    })
 }

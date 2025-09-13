@@ -8,6 +8,7 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/person/dto"
 	"github.com/omatheuscaetano/planus-api/internal/person/model"
 	"github.com/omatheuscaetano/planus-api/internal/person/store"
+	dbDto "github.com/omatheuscaetano/planus-api/pkg/db/dto"
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
 )
 
@@ -19,11 +20,11 @@ func NewPersonService(store store.PersonStore) *PersonService {
 	return &PersonService{store: store}
 }
 
-func (s *PersonService) Paginate(c context.Context, dto *dto.PaginatePerson) (*dto.PaginatedPerson, *errs.Error) {
+func (s *PersonService) Paginate(c context.Context, dto *dbDto.Paginate) (*dbDto.PaginatedData[model.Person], *errs.Error) {
 	return s.store.Paginate(c, dto)
 }
 
-func (s *PersonService) All(c context.Context, dto *dto.ListPerson) ([]*model.Person, *errs.Error) {
+func (s *PersonService) All(c context.Context, dto *dbDto.List) ([]*model.Person, *errs.Error) {
 	return s.store.All(c, dto)
 }
 

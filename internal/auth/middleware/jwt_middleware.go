@@ -34,7 +34,7 @@ func JWTMiddleware() gin.HandlerFunc {
         token, err := jwt.ParseWithClaims(tokenString, &dto.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
             return []byte(app.JWTSecret()), nil
         })
-        
+
         if err != nil || !token.Valid {
             responses.Error(c, errs.New(http.StatusUnauthorized, "Token de autenticação inválido ou expirado"))
             return
@@ -46,7 +46,7 @@ func JWTMiddleware() gin.HandlerFunc {
             return
         }
 
-        if appCtx, ok := c.Request.Context().(*app.AppContext); ok {
+        if appCtx, ok := c.Request.Context().(*app.Context); ok {
             appCtx.UserID = &claims.Sub
         }
 

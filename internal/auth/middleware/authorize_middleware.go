@@ -14,7 +14,7 @@ import (
 
 func AuthorizeMiddleware(actions []dto.P) gin.HandlerFunc {
     return func(c *gin.Context) {
-        userID := c.Request.Context().(*app.AppContext).UserID
+        userID := c.Request.Context().(*app.Context).UserID
 
         if userID == nil {
             responses.Error(c, errs.New(http.StatusUnauthorized, "Não foi possível identificar o usuário autenticado"))
@@ -34,7 +34,7 @@ func AuthorizeMiddleware(actions []dto.P) gin.HandlerFunc {
                 operator = ""
             }
 
-            query += fmt.Sprintf(" %s (module = ? AND action = ?)", operator)   
+            query += fmt.Sprintf(" %s (module = ? AND action = ?)", operator)
             args = append(args, action.Module, action.Action)
         }
 

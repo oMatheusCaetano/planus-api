@@ -7,7 +7,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type AppContext struct {
+type Context struct {
 	context.Context
 	UserID *int
 }

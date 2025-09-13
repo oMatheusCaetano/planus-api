@@ -2,8 +2,6 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/omatheuscaetano/planus-api/internal/auth/dto"
-	middlewares "github.com/omatheuscaetano/planus-api/internal/auth/middleware"
 	"github.com/omatheuscaetano/planus-api/internal/person/handler"
 	"github.com/omatheuscaetano/planus-api/internal/person/service"
 	"github.com/omatheuscaetano/planus-api/internal/person/store"
@@ -15,41 +13,36 @@ func Routes(r *gin.RouterGroup) {
 	personService := service.NewPersonService(personStore)
 	personHandler := handler.NewPersonHandler(personService)
 
-	personGroup := r.Group("/person").Use(middlewares.JWTMiddleware())
+	personGroup := r.Group("/person")
+		// .Use(middlewares.JWTMiddleware())
 	{
 		personGroup.POST(
-			"/paginate", 
-			middlewares.AuthorizeMiddleware([]dto.P{{Module: "person", Action: "read"}}),
+			"/paginate",
 			personHandler.Paginate,
 		)
 
 		personGroup.POST(
-			"/list", 
-			middlewares.AuthorizeMiddleware([]dto.P{{Module: "person", Action: "read"}}),
+			"/list",
 			personHandler.List,
 		)
 
 		personGroup.GET(
-			"/:id", 
-			middlewares.AuthorizeMiddleware([]dto.P{{Module: "person", Action: "read"}}),
+			"/:id",
 			personHandler.Find,
 		)
 
 		personGroup.POST(
-			"", 
-			middlewares.AuthorizeMiddleware([]dto.P{{Module: "person", Action: "create"}}),
+			"",
 			personHandler.Create,
 		)
 
 		personGroup.PUT(
 			":id",
-			middlewares.AuthorizeMiddleware([]dto.P{{Module: "person", Action: "update"}}),
 			personHandler.Update,
 		)
 
 		personGroup.DELETE(
 			":id",
-			middlewares.AuthorizeMiddleware([]dto.P{{Module: "person", Action: "delete"}}),
 			personHandler.Delete,
 		)
 	}

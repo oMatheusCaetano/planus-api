@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/person/dto"
 	"github.com/omatheuscaetano/planus-api/internal/person/service"
+	dbDto "github.com/omatheuscaetano/planus-api/pkg/db/dto"
 	"github.com/omatheuscaetano/planus-api/pkg/responses"
 )
 
@@ -18,7 +19,7 @@ func NewPersonHandler(service *service.PersonService) *PersonHandler {
 }
 
 func (h *PersonHandler) Paginate(c *gin.Context) {
-	var dto dto.PaginatePerson
+	var dto dbDto.Paginate
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		responses.BadRequest(c, err)
 		return
@@ -34,7 +35,7 @@ func (h *PersonHandler) Paginate(c *gin.Context) {
 }
 
 func (h *PersonHandler) List(c *gin.Context) {
-	var dto dto.ListPerson
+	var dto dbDto.List
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		responses.BadRequest(c, err)
 		return
