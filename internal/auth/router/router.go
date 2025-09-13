@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/auth/handler"
+	"github.com/omatheuscaetano/planus-api/internal/auth/middleware"
 	"github.com/omatheuscaetano/planus-api/internal/auth/service"
 	"github.com/omatheuscaetano/planus-api/internal/auth/store"
 	personStore "github.com/omatheuscaetano/planus-api/internal/person/store"
@@ -19,5 +20,6 @@ func Routes(r *gin.RouterGroup) {
 	authGroup := r.Group("/auth")
 	{
 		authGroup.POST("/login", authHandler.Login)
+		authGroup.GET("/me", middleware.JWTMiddleware(), authHandler.Me)
 	}
 }

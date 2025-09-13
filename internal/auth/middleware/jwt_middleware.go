@@ -46,9 +46,7 @@ func JWTMiddleware() gin.HandlerFunc {
             return
         }
 
-        if appCtx, ok := c.Request.Context().(*app.Context); ok {
-            appCtx.UserID = &claims.Sub
-        }
+        c.Set("user_id", claims.Sub)
 
         c.Next()
     }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/auth/dto"
 	"github.com/omatheuscaetano/planus-api/internal/auth/model"
 	"github.com/omatheuscaetano/planus-api/internal/auth/store"
+	personModel "github.com/omatheuscaetano/planus-api/internal/person/model"
 	personStore "github.com/omatheuscaetano/planus-api/internal/person/store"
 	"github.com/omatheuscaetano/planus-api/pkg/app"
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
@@ -54,7 +56,7 @@ func (s *AuthService) generateJWT(user *model.User) (*dto.LoginData, *errs.Error
     return loginData, nil
 }
 
-func (s *AuthService) Login(c app.Context, dto *dto.Login) (*dto.LoginData, *errs.Error) {
+func (s *AuthService) Login(c context.Context, dto *dto.Login) (*dto.LoginData, *errs.Error) {
     user, _ := s.store.FindUserByEmail(c, strings.ToLower(strings.TrimSpace(dto.Email)))
 
     if s.validateCredentials(user, dto.Password) != nil {
@@ -75,7 +77,7 @@ func (s *AuthService) Login(c app.Context, dto *dto.Login) (*dto.LoginData, *err
     return data, nil
 }
 
-func (s *AuthService) Create(c app.Context, dto *dto.CreateUser) (*model.User, *errs.Error) {
+func (s *AuthService) Create(c context.Context, dto *dto.CreateUser) (*model.User, *errs.Error) {
     hashedPassword, err := bcrypt.GenerateFromPassword([]byte(dto.Password), bcrypt.DefaultCost)
     if err != nil {
         return nil, errs.From(err)
@@ -87,4 +89,8 @@ func (s *AuthService) Create(c app.Context, dto *dto.CreateUser) (*model.User, *
         CreatedAt: time.Now(),
         UpdatedAt: time.Now(),
     })
+}
+
+func (s *AuthService) Me(c context.Context, id int) (*personModel.Person, *errs.Error) {
+    return s.personStore.Find(c, id)
 }

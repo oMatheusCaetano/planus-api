@@ -13,8 +13,8 @@ import (
 type ApiJSONResponse struct {
     Code      int         `json:"code"`
     Message   string      `json:"message"`
-    IsError   bool        `json:"is_error"`
-    IsSuccess bool        `json:"is_success"`
+    Error   bool          `json:"error"`
+    Success bool          `json:"success"`
     Data      any         `json:"data,omitempty"`
     Meta      any         `json:"meta,omitempty"`
 }
@@ -33,8 +33,8 @@ func JSONReturn(code int, message string, payload any, meta any) *ApiJSONRespons
 	return &ApiJSONResponse{
 		Code:      code,
 		Message:   msg,
-		IsError:   isError,
-		IsSuccess: isSuccess,
+		Error:     isError,
+		Success:   isSuccess,
 		Meta:      meta,
 		Data:      payload,
 	}
@@ -56,7 +56,7 @@ func Error(c *gin.Context, err error) {
 }
 
 func BadRequest(c *gin.Context, err error) {
-	Abort(c, http.StatusBadRequest, err.Error(), translateValidationErrors(err), nil)
+	Abort(c, http.StatusBadRequest, "Dados inválidos", translateValidationErrors(err), nil)
 }
 
 func Ok(c *gin.Context, payload any) {

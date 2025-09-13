@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   database:
     build:
@@ -17,6 +15,8 @@ services:
       - "${DB_PORT}:${DB_CONTAINER_PORT}"
     volumes:
       - .docker/database/volumes/data:/var/lib/postgresql/data
+    networks:
+      - planus
 
   api:
     build:
@@ -33,3 +33,12 @@ services:
       - /app/bin
     depends_on:
       - database
+    networks:
+      - planus
+
+networks:
+  planus:
+    name: planus_network
+    driver: bridge
+
+
