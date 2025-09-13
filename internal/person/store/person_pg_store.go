@@ -72,54 +72,56 @@ func (r *PersonPgStore) Find(c context.Context, id int) (*model.Person, *errs.Er
     wg := sync.WaitGroup{}
     wg.Add(2)
 
-    //! Fetch person
     go func() {
         defer wg.Done()
 
-        query := function.QueryBuilder().
-            Select("id", "name", "created_at", "updated_at").
-            From(r.tableName).
-            Where(sq.Eq{"id": id})
+		person := &model.Person{}
+		err := function.Find(c, &function.FindProps{
+			DB:        r.db,
+			TableName: r.tableName,
+			Select: func() []string {
+				return []string{"id", "name", "created_at", "updated_at"}
+			},
+			Where: func(b sq.SelectBuilder) sq.SelectBuilder {
+				return b.Where(sq.Eq{"id": id})
+			},
+			Scan: func() []any {
+				return []any{&person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt}
+			},
+		})
 
-        sqlStr, args, err := query.ToSql()
-        if err != nil {
-            resultCh <- findResult{err: errs.From(err)}
+		if err != nil {
+			resultCh <- findResult{err: errs.From(err)}
             return
-        }
+		}
 
-        person := &model.Person{}
-        if err := r.db.QueryRowContext(c, sqlStr, args...).Scan(
-            &person.ID, &person.Name, &person.CreatedAt, &person.UpdatedAt,
-        ); err != nil {
-            resultCh <- findResult{err: errs.From(err)}
-            return
-        }
-
-        resultCh <- findResult{person: person}
+		resultCh <- findResult{person: person}
     }()
 
-    //! Fetch associated user
     go func() {
         defer wg.Done()
 
-        query := function.QueryBuilder().
-            Select("email", "created_at", "updated_at").
-            From("users").
-            Where(sq.Eq{"id": id})
+		user := &userModel.User{}
+		err := function.Find(c, &function.FindProps{
+			DB:        r.db,
+			TableName: "users",
+			Select: func() []string {
+				return []string{"email", "created_at", "updated_at"}
+			},
+			Where: func(b sq.SelectBuilder) sq.SelectBuilder {
+				return b.Where(sq.Eq{"id": id})
+			},
+			Scan: func() []any {
+				return []any{&user.Email, &user.CreatedAt, &user.UpdatedAt}
+			},
+		})
 
-        sqlStr, args, err := query.ToSql()
-        if err != nil {
-            resultCh <- findResult{err: errs.From(err)}
+		if err != nil {
+			resultCh <- findResult{err: errs.From(err)}
             return
-        }
+		}
 
-        user := &userModel.User{}
-        if err := r.db.QueryRowContext(c, sqlStr, args...).Scan(&user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
-            resultCh <- findResult{err: errs.From(err)}
-            return
-        }
-
-        resultCh <- findResult{user: user}
+		resultCh <- findResult{user: user}
     }()
 
     go func() {
