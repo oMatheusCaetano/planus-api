@@ -15,6 +15,11 @@ func NewAppHandler() *AppHandler {
 	return &AppHandler{}
 }
 
+// @Summary Welcome
+// @Description Returns a welcome message
+// @Tags App
+// @Success 200 {object} response.WelcomeResponse
+// @Router / [get]
 func (h *AppHandler) Welcome(c *gin.Context) {
 	c.JSON(http.StatusOK, response.WelcomeResponse{
 		Message:   "Bem-vindo à API " + env.AppName() + "!",

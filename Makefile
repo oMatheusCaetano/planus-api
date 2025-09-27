@@ -15,3 +15,9 @@ test:
 
 tidy:
 	@$(DOCKER_EXEC_API) go mod tidy
+
+get:
+	@$(DOCKER_EXEC_API) go get $(filter-out $@,$(MAKECMDGOALS))
+
+swagger:
+	@$(DOCKER_EXEC_API) swag init -g cmd/api/main.go -o docs

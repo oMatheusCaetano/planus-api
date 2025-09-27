@@ -1,0 +1,27 @@
+basePath: /
+definitions:
+  response.WelcomeResponse:
+    properties:
+      mensagem:
+        type: string
+      timestamp:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: This is the API documentation for the Planus application.
+  title: Planus API
+  version: "1.0"
+paths:
+  /:
+    get:
+      description: Returns a welcome message
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.WelcomeResponse'
+      summary: Welcome
+      tags:
+      - App
+swagger: "2.0"
