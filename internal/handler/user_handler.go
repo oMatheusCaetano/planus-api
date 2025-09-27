@@ -2,16 +2,17 @@ package handler
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omatheuscaetano/planus-api/internal/model"
+	"github.com/omatheuscaetano/planus-api/internal/service"
 )
 
-type UserHandler struct{}
+type UserHandler struct{
+	s *service.UserService
+}
 
-func NewUserHandler() *UserHandler {
-	return &UserHandler{}
+func NewUserHandler(s *service.UserService) *UserHandler {
+	return &UserHandler{s: s}
 }
 
 // @Summary Find User
@@ -20,11 +21,11 @@ func NewUserHandler() *UserHandler {
 // @Success 200 {object} model.User
 // @Router /user/{id} [get]
 func (h *UserHandler) Find(c *gin.Context) {
-	c.JSON(http.StatusOK, model.User{
-		ID:        "1",
-		Name:      "John Doe",
-		Username:  "johndoe",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	})
+	id := c.Param("id")
+	user, err := h.s.Find(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(err.Code, err)
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }
