@@ -1,0 +1,14 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: .docker/api/dev/Dockerfile
+    image: ${API_IMAGE_NAME}
+    container_name: ${API_CONTAINER_NAME}
+    environment:
+      TZ: ${TIMEZONE}
+    ports:
+      - ${API_PORT}:${API_CONTAINER_PORT}
+    volumes:
+      - .:/app
+      - /app/bin
