@@ -10,6 +10,9 @@ DOCKER_EXEC_API = docker exec -it $(API_CONTAINER_NAME)
 run:
 	docker compose -f $(DOCKER_COMPOSE_FILE) up --build --force-recreate
 
+run.detach:
+	docker compose -f $(DOCKER_COMPOSE_FILE) up --build --force-recreate --detach
+
 test:
 	@$(DOCKER_EXEC_API) go test ./... -covermode=atomic
 

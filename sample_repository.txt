@@ -1,0 +1,136 @@
+// internal/repository/user_repository.go
+package repository
+
+import (
+	"context"
+	"time"
+
+	"your-api/internal/model"
+	"your-api/pkg/db/mongo"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+type UserRepository struct {
+	db *mongo.MongoDB
+}
+
+func NewUserRepository(db *mongo.MongoDB) *UserRepository {
+	return &UserRepository{
+		db: db,
+	}
+}
+
+func (r *UserRepository) Create(ctx context.Context, user *model.User) error {
+	collection := r.db.GetCollection("users")
+
+	user.ID = primitive.NewObjectID().Hex()
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
+
+	_, err := collection.InsertOne(ctx, user)
+	return err
+}
+
+func (r *UserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
+	collection := r.db.GetCollection("users")
+
+	var user model.User
+	err := collection.FindOne(ctx, bson.M{"id": id}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
+	collection := r.db.GetCollection("users")
+
+	var user model.User
+	err := collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) Update(ctx context.Context, id string, user *model.User) error {
+	collection := r.db.GetCollection("users")
+
+	user.UpdatedAt = time.Now()
+
+	update := bson.M{
+		"$set": bson.M{
+			"name":       user.Name,
+			"username":   user.Username,
+			"password":   user.Password,
+			"updated_at": user.UpdatedAt,
+		},
+	}
+
+	_, err := collection.UpdateOne(ctx, bson.M{"id": id}, update)
+	return err
+}
+
+func (r *UserRepository) Delete(ctx context.Context, id string) error {
+	collection := r.db.GetCollection("users")
+
+	_, err := collection.DeleteOne(ctx, bson.M{"id": id})
+	return err
+}
+
+func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*model.User, error) {
+	collection := r.db.GetCollection("users")
+
+	opts := options.Find()
+	if limit > 0 {
+		opts.SetLimit(int64(limit))
+	}
+	if offset > 0 {
+		opts.SetSkip(int64(offset))
+	}
+	opts.SetSort(bson.D{{"created_at", -1}})
+
+	cursor, err := collection.Find(ctx, bson.M{}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var users []*model.User
+	for cursor.Next(ctx) {
+		var user model.User
+		if err := cursor.Decode(&user); err != nil {
+			return nil, err
+		}
+		users = append(users, &user)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (r *UserRepository) Count(ctx context.Context) (int64, error) {
+	collection := r.db.GetCollection("users")
+
+	count, err := collection.CountDocuments(ctx, bson.M{})
+	return count, err
+}
+
+func (r *UserRepository) Exists(ctx context.Context, username string) (bool, error) {
+	collection := r.db.GetCollection("users")
+
+	count, err := collection.CountDocuments(ctx, bson.M{"username": username})
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}

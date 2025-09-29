@@ -1,4 +1,30 @@
 services:
+  mongodb:
+    image: mongo:7
+    container_name: ${DB_CONTAINER_NAME}
+    ports:
+      - ${DB_PORT}:${DB_CONTAINER_PORT}
+    environment:
+      TZ: ${TIMEZONE}
+      MONGO_INITDB_ROOT_USERNAME: ${DB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    volumes:
+      - .docker/db/volumes/mongo:/data/db
+
+  mongodb_test:
+    image: mongo:7
+    container_name: ${DB_TEST_CONTAINER_NAME}
+    ports:
+      - ${DB_TEST_PORT}:${DB_TEST_CONTAINER_PORT}
+    environment:
+      TZ: ${TIMEZONE}
+      MONGO_INITDB_ROOT_USERNAME: ${DB_TEST_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_TEST_PASSWORD}
+      MONGO_INITDB_DATABASE: ${DB_TEST_NAME}
+    volumes:
+      - .docker/db/volumes/mongo_test:/data/db
+
   api:
     build:
       context: .

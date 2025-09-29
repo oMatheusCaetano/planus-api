@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
 	"github.com/omatheuscaetano/planus-api/internal/router"
+	mongo "github.com/omatheuscaetano/planus-api/pkg/db"
 	"github.com/omatheuscaetano/planus-api/pkg/env"
 )
 
@@ -13,7 +14,13 @@ import (
 // @basePath /
 func main() {
 	env.Load()
-	instances := dependency_container.InstantiateAll()
+
+	mongodb := mongo.NewProductionMongoDb()
+	instances := dependency_container.InstantiateAll(
+		&dependency_container.InstancesConfig{
+			Mongo: mongodb,
+		},
+	)
 
 	gin := gin.Default()
 

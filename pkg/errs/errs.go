@@ -42,6 +42,13 @@ func BadRequest(message string) *Error {
     }
 }
 
+func ResourceNotFound() *Error {
+    return &Error{
+        Code:    http.StatusNotFound,
+        Message: "Recurso não encontrado",
+    }
+}
+
 func (err *Error) Error() string {
     return err.Message
 }
@@ -65,11 +72,10 @@ func From(err error) *Error {
 
 func mapErrorToAppError(err error) *Error {
     switch err.Error() {
-    case "sql: no rows in result set":
-        return &Error{
-            Code:    http.StatusNotFound,
-            Message: "Recurso não encontrado",
-        }
+    case
+        "sql: no rows in result set",
+        "mongo: no documents in result":
+        return ResourceNotFound()
     default:
         return &Error{
             Code:    http.StatusInternalServerError,

@@ -2,24 +2,20 @@ package service
 
 import (
 	"context"
-	"time"
 
 	"github.com/omatheuscaetano/planus-api/internal/model"
+	"github.com/omatheuscaetano/planus-api/internal/repository"
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
 )
 
-type UserService struct {}
-
-func NewUserService() *UserService {
-	return &UserService{}
+type UserService struct {
+	r repository.UserRepository
 }
 
-func (s *UserService) Find(c context.Context, id string) (*model.User, *errs.Error) {
-	return &model.User{
-		ID:        "1",
-		Name:      "John Doe",
-		Username:  "johndoe",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}, nil
+func NewUserService(r repository.UserRepository) *UserService {
+	return &UserService{r: r}
+}
+
+func (s *UserService) Find(c context.Context, id model.ID) (*model.User, *errs.Error) {
+	return s.r.Find(c, id)
 }

@@ -2,6 +2,7 @@ package dependency_container
 
 import (
 	"github.com/omatheuscaetano/planus-api/internal/handler"
+	"github.com/omatheuscaetano/planus-api/internal/repository"
 	"github.com/omatheuscaetano/planus-api/internal/service"
 )
 
@@ -13,10 +14,10 @@ type UserInstances struct {
 	Handlers *UserHandlers
 }
 
-func InstantiateUser() *UserInstances {
+func InstantiateUser(c *InstancesConfig) *UserInstances {
 	return &UserInstances{
 		Handlers: &UserHandlers{
-			User: handler.NewUserHandler(service.NewUserService()),
+			User: handler.NewUserHandler(service.NewUserService(repository.NewUserMongoRepository(c.Mongo))),
 		},
 	}
 }

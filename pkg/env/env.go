@@ -27,3 +27,47 @@ func ApiPort() string {
 func AppName() string {
 	return Get("APP_NAME")
 }
+
+func DBHost() string {
+	return Get("DB_HOST")
+}
+
+func DBPort() string {
+	return Get("DB_CONTAINER_PORT")
+}
+
+func DBName() string {
+	return Get("DB_NAME")
+}
+
+func DBUser() string {
+	return Get("DB_USER")
+}
+
+func DBPassword() string {
+	return Get("DB_PASSWORD")
+}
+
+func DBTestHost() string {
+	return Get("DB_TEST_HOST")
+}
+
+func DBTestPort() string {
+	return Get("DB_TEST_CONTAINER_PORT")
+}
+
+func DBTestName() string {
+	return Get("DB_TEST_NAME")
+}
+
+func DBTestUser() string {
+	return Get("DB_TEST_USER")
+}
+
+func DBTestPassword() string {
+	return Get("DB_TEST_PASSWORD")
+}
+
+func Timezone() string {
+	return Get("TIMEZONE")
+}

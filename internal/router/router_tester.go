@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
+	mongo "github.com/omatheuscaetano/planus-api/pkg/db"
 	"github.com/omatheuscaetano/planus-api/pkg/env"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,6 +20,7 @@ type RouterTester struct {
 	engine       *gin.Engine
 	response     *httptest.ResponseRecorder
 	responseBody map[string]any
+	mongo        *mongo.MongoDB
 }
 
 func NewRouterTester(t *testing.T) *RouterTester {
@@ -26,9 +29,17 @@ func NewRouterTester(t *testing.T) *RouterTester {
 	tester := &RouterTester{
 		t:      t,
 		engine: gin.New(),
+		mongo:  mongo.NewTestMongoDb(),
 	}
 
-	instances := dependency_container.InstantiateAll()
+	err := tester.mongo.Connect(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to connect to MongoDB: %v", err)
+	}
+
+	instances := dependency_container.InstantiateAll(&dependency_container.InstancesConfig{
+		Mongo: tester.mongo,
+	})
 	AllRoutes(tester.engine, instances)
 
 	return tester
@@ -84,5 +95,17 @@ func (tester *RouterTester) AssertBodyValue(key string, value any) *RouterTester
 	body := *tester.Body()
 	assert.Contains(tester.t, body, key)
 	assert.Equal(tester.t, value, body[key])
+	return tester
+}
+
+func (tester *RouterTester) AssertBodyValueIsDateTime(key string, value time.Time) *RouterTester {
+	body := *tester.Body()
+	assert.Contains(tester.t, body, key)
+	assert.IsType(tester.t, "", body[key])
+
+	parsedTime, err := time.Parse(time.RFC3339, body[key].(string))
+	assert.NoError(tester.t, err)
+	assert.Equal(tester.t, value.Format("2006-01-02 15:04:05"), parsedTime.Format("2006-01-02 15:04:05"))
+
 	return tester
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/omatheuscaetano/planus-api/pkg/env"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -24,12 +25,35 @@ type Config struct {
 
 // MongoDB represents the MongoDB database connection
 type MongoDB struct {
-	Client   *mongo.Client
-	Database *mongo.Database
+	C        *mongo.Client
+	DB       *mongo.Database
 	config   *Config
 }
 
-// NewMongoDB creates a new MongoDB instance with the given configuration
+func NewProductionMongoDb() *MongoDB {
+	return NewMongoDB(&Config{
+		URI:             "mongodb://" + env.DBUser() + ":" + env.DBPassword() + "@" + env.DBHost() + ":" + env.DBPort() + "/" + env.DBName() + "?authSource=admin",
+		Database:        env.DBName(),
+		MaxPoolSize:     100,
+		MinPoolSize:     10,
+		MaxConnIdleTime: 30 * time.Minute,
+		ConnectTimeout:  10 * time.Second,
+		SocketTimeout:   30 * time.Second,
+	})
+}
+
+func NewTestMongoDb() *MongoDB {
+	return NewMongoDB(&Config{
+		URI:             "mongodb://" + env.DBTestUser() + ":" + env.DBTestPassword() + "@" + env.DBTestHost() + ":" + env.DBTestPort() + "/" + env.DBTestName() + "?authSource=admin",
+		Database:        env.DBTestName(),
+		MaxPoolSize:     100,
+		MinPoolSize:     10,
+		MaxConnIdleTime: 30 * time.Minute,
+		ConnectTimeout:  10 * time.Second,
+		SocketTimeout:   30 * time.Second,
+	})
+}
+
 func NewMongoDB(config *Config) *MongoDB {
 	return &MongoDB{
 		config: config,
@@ -85,23 +109,22 @@ func (m *MongoDB) Connect(ctx context.Context) error {
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 
-	m.Client = client
-	m.Database = client.Database(m.config.Database)
+	m.C = client
+	m.DB = client.Database(m.config.Database)
 
-	log.Printf("Successfully connected to MongoDB database: %s", m.config.Database)
 	return nil
 }
 
 // Disconnect closes the MongoDB connection
 func (m *MongoDB) Disconnect(ctx context.Context) error {
-	if m.Client == nil {
+	if m.C == nil {
 		return nil
 	}
 
 	disconnectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	if err := m.Client.Disconnect(disconnectCtx); err != nil {
+	if err := m.C.Disconnect(disconnectCtx); err != nil {
 		return fmt.Errorf("failed to disconnect from MongoDB: %w", err)
 	}
 
@@ -111,14 +134,14 @@ func (m *MongoDB) Disconnect(ctx context.Context) error {
 
 // Health checks the database connection health
 func (m *MongoDB) Health(ctx context.Context) error {
-	if m.Client == nil {
+	if m.C == nil {
 		return fmt.Errorf("mongodb client is not initialized")
 	}
 
 	healthCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	if err := m.Client.Ping(healthCtx, readpref.Primary()); err != nil {
+	if err := m.C.Ping(healthCtx, readpref.Primary()); err != nil {
 		return fmt.Errorf("mongodb health check failed: %w", err)
 	}
 
@@ -126,30 +149,30 @@ func (m *MongoDB) Health(ctx context.Context) error {
 }
 
 // GetCollection returns a MongoDB collection
-func (m *MongoDB) GetCollection(name string) *mongo.Collection {
-	return m.Database.Collection(name)
+func (m *MongoDB) Collection(name string) *mongo.Collection {
+	return m.DB.Collection(name)
 }
 
 // GetDatabase returns the MongoDB database instance
-func (m *MongoDB) GetDatabase() *mongo.Database {
-	return m.Database
+func (m *MongoDB) Database() *mongo.Database {
+	return m.DB
 }
 
 // GetClient returns the MongoDB client instance
-func (m *MongoDB) GetClient() *mongo.Client {
-	return m.Client
+func (m *MongoDB) Client() *mongo.Client {
+	return m.C
 }
 
 // Drop drops the entire database (use with caution!)
 func (m *MongoDB) Drop(ctx context.Context) error {
-	if m.Database == nil {
+	if m.DB == nil {
 		return fmt.Errorf("database is not initialized")
 	}
 
 	dropCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	if err := m.Database.Drop(dropCtx); err != nil {
+	if err := m.DB.Drop(dropCtx); err != nil {
 		return fmt.Errorf("failed to drop database: %w", err)
 	}
 
@@ -178,7 +201,7 @@ func (m *MongoDB) CreateIndexes(ctx context.Context) error {
 
 // Stats returns database statistics
 // func (m *MongoDB) Stats(ctx context.Context) (*mongo.DatabaseStats, error) {
-// 	if m.Database == nil {
+// 	if m.DB == nil {
 // 		return nil, fmt.Errorf("database is not initialized")
 // 	}
 
@@ -186,7 +209,7 @@ func (m *MongoDB) CreateIndexes(ctx context.Context) error {
 // 	defer cancel()
 
 // 	var stats mongo.DatabaseStats
-// 	err := m.Database.RunCommand(statsCtx, map[string]interface{}{"dbStats": 1}).Decode(&stats)
+// 	err := m.DB.RunCommand(statsCtx, map[string]interface{}{"dbStats": 1}).Decode(&stats)
 // 	if err != nil {
 // 		return nil, fmt.Errorf("failed to get database stats: %w", err)
 // 	}
