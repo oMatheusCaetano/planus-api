@@ -10,4 +10,5 @@ import (
 
 type UserRepository interface {
 	Find(ctx context.Context, id model.ID) (*model.User, *errs.Error)
+	Delete(ctx context.Context, id model.ID) *errs.Error
 }

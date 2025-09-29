@@ -30,3 +30,13 @@ func (h *UserHandler) Find(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, user)
 }
+
+func (h *UserHandler) Delete(c *gin.Context) {
+	id := c.Param("id")
+	err := h.s.Delete(c.Request.Context(), model.ID(id))
+	if err != nil {
+		c.JSON(err.Code, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}

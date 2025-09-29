@@ -53,6 +53,14 @@ func (tester *RouterTester) Get(path string) *RouterTester {
 	return tester
 }
 
+func (tester *RouterTester) Delete(path string) *RouterTester {
+	tester.responseBody = nil
+	tester.response = httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", path, nil)
+	tester.engine.ServeHTTP(tester.response, req)
+	return tester
+}
+
 func (tester *RouterTester) Body() *map[string]any {
 	if (tester.responseBody == nil) {
 		bodyString := tester.response.Body.String()

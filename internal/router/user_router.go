@@ -7,5 +7,6 @@ import (
 
 func UserRouter(g *gin.Engine, i *dependency_container.UserInstances) {
 	g.Group("/user").
-		GET("/:id", i.Handlers.User.Find)
+		GET("/:id", i.Handlers.User.Find).
+		DELETE("/:id", i.Handlers.User.Delete)
 }

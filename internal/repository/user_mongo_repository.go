@@ -7,6 +7,7 @@ import (
 	mongo "github.com/omatheuscaetano/planus-api/pkg/db"
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
 	"go.mongodb.org/mongo-driver/bson"
+	// mongodriver "go.mongodb.org/mongo-driver/mongo"
 )
 
 
@@ -37,4 +38,16 @@ func (r *UserMongoRepository) Find(ctx context.Context, id model.ID) (*model.Use
 	user.CreatedAt = model.UTCToLocal(user.CreatedAt)
 	user.UpdatedAt = model.UTCToLocal(user.UpdatedAt)
 	return &user, nil
+}
+
+func (r *UserMongoRepository) Delete(ctx context.Context, id model.ID) *errs.Error {
+	collection := r.db.Collection(r.collectionName)
+	_, err := collection.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		// if err == mongodriver.ErrNoDocuments {
+		// 	return nil
+		// }
+		return errs.From(err)
+	}
+	return nil
 }
