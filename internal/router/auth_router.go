@@ -5,7 +5,7 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
 )
 
-func AuthRouter(g *gin.RouterGroup, i *dependency_container.AuthInstances) {
+func AuthRouter(g *gin.RouterGroup, i *dependency_container.Instances) {
 	g.Group("/auth").
-		POST("/login", i.Handlers.Auth.Login)
+		POST("/login", i.Auth.Handlers.Auth.Login)
 }

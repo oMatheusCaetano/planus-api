@@ -5,6 +5,6 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
 )
 
-func AppRouter(g *gin.RouterGroup, i *dependency_container.AppInstances) {
-	g.GET("/", i.Handlers.App.Welcome)
+func AppRouter(g *gin.RouterGroup, i *dependency_container.Instances) {
+	g.GET("/", i.App.Handlers.App.Welcome)
 }

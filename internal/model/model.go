@@ -8,10 +8,14 @@ import (
 	"github.com/omatheuscaetano/planus-api/pkg/errs"
 )
 
+type ID string
+type Permission string
+
+
 type Model struct {
-	ID        ID        `bson:"_id"        json:"id"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
+	ID          ID           `bson:"_id"         json:"id"`
+	CreatedAt   time.Time    `bson:"created_at"  json:"created_at"`
+	UpdatedAt   time.Time    `bson:"updated_at"  json:"updated_at"`
 }
 
 func newModel() Model {
@@ -34,7 +38,6 @@ func (m *Model) OnRead() *errs.Error {
 	return nil
 }
 
-type ID string
 
 func (id ID) String() string {
 	return string(id)

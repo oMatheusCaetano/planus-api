@@ -6,11 +6,16 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/service"
 )
 
+type UserServices struct {
+	User *service.UserService
+}
+
 type UserHandlers struct {
 	User *handler.UserHandler
 }
 
 type UserInstances struct {
+	Services *UserServices
 	Handlers *UserHandlers
 }
 
@@ -27,11 +32,16 @@ func NewUserHandler(_ *InstancesConfig, svc *service.UserService) *handler.UserH
 }
 
 func InstantiateUser(c *InstancesConfig) *UserInstances {
+	services := &UserServices{
+		User: NewUserService(c, NewUserMongoRepository(c)),
+	}
 
+	handlers := &UserHandlers{
+		User: NewUserHandler(c, services.User),
+	}
 
 	return &UserInstances{
-		Handlers: &UserHandlers{
-			User: NewUserHandler(c, NewUserService(c, NewUserMongoRepository(c))),
-		},
+		Services: services,
+		Handlers: handlers,
 	}
 }

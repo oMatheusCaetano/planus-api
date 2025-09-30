@@ -17,7 +17,7 @@ func AllRoutes(g *gin.Engine, i *dependency_container.Instances) {
 
 	api.GET("/swagger/*any", ginSwagger.WrapHandler(files.Handler))
 
-	AuthRouter(api, i.Auth)
-	AppRouter(api, i.App)
-	UserRouter(api, i.User)
+	AuthRouter(api, i)
+	AppRouter(api, i)
+	UserRouter(api, i)
 }
