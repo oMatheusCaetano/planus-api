@@ -6,7 +6,7 @@ import (
 	"github.com/omatheuscaetano/planus-api/internal/middleware"
 )
 
-func UserRouter(g *gin.Engine, i *dependency_container.UserInstances) {
+func UserRouter(g *gin.RouterGroup, i *dependency_container.UserInstances) {
 	group := g.Group("/user")
 	group.Use(middleware.JWTMiddleware())
 	group.

@@ -3,16 +3,21 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
+	"github.com/omatheuscaetano/planus-api/internal/middleware"
 
 	_ "github.com/omatheuscaetano/planus-api/docs"
-	swaggerfiles "github.com/swaggo/files"
+	files "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func AllRoutes(g *gin.Engine, i *dependency_container.Instances) {
-	g.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	api := g.Group("")
 
-	AuthRouter(g, i.Auth)
-	AppRouter(g, i.App)
-	UserRouter(g, i.User)
+	api.Use(middleware.CORSMiddleware())
+
+	api.GET("/swagger/*any", ginSwagger.WrapHandler(files.Handler))
+
+	AuthRouter(api, i.Auth)
+	AppRouter(api, i.App)
+	UserRouter(api, i.User)
 }
