@@ -1,25 +1,27 @@
 package model
 
-import "time"
+import (
+	"github.com/omatheuscaetano/planus-api/pkg/errs"
+	"golang.org/x/crypto/bcrypt"
+)
 
 type User struct {
-	ID        ID        `bson:"_id"        json:"id"`
+    Model               `bson:",inline"`
 	Name      string    `bson:"name"       json:"name"`
 	Username  string    `bson:"username"   json:"username"`
 	Password  string    `bson:"password"   json:"-"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
 }
 
-func NewUser(name, username, hashedPassword string) *User {
-    now := time.Now()
+func NewUser(name, username, rawPassword string) (*User, *errs.Error) {
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, errs.New(500, "Failed to hash password")
+	}
 
     return &User{
-        ID:        NewID(),
+        Model:     newModel(),
         Name:      name,
         Username:  username,
-        Password:  hashedPassword,
-        CreatedAt: now,
-        UpdatedAt: now,
-    }
+        Password:  string(hashedPassword),
+    }, nil
 }

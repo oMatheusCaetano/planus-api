@@ -3,8 +3,10 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,9 +63,21 @@ func (tester *RouterTester) Delete(path string) *RouterTester {
 	return tester
 }
 
+func (tester *RouterTester) Post(path string, body any) *RouterTester {
+	tester.responseBody = nil
+	tester.response = httptest.NewRecorder()
+	jsonBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", path, strings.NewReader(string(jsonBody)))
+	req.Header.Set("Content-Type", "application/json")
+
+	tester.engine.ServeHTTP(tester.response, req)
+	return tester
+}
+
 func (tester *RouterTester) Body() *map[string]any {
 	if (tester.responseBody == nil) {
 		bodyString := tester.response.Body.String()
+		log.Println("Response Body:", bodyString) // Debugging line
 		bodyMap := make(map[string]any)
 		json.Unmarshal([]byte(bodyString), &bodyMap)
 		tester.responseBody = bodyMap
@@ -99,10 +113,35 @@ func (tester *RouterTester) AssertBodyKeyIsDate(expected string) *RouterTester {
 	return tester
 }
 
+
 func (tester *RouterTester) AssertBodyValue(key string, value any) *RouterTester {
 	body := *tester.Body()
-	assert.Contains(tester.t, body, key)
-	assert.Equal(tester.t, value, body[key])
+
+	// Split the key by dots to handle nested paths
+	keys := strings.Split(key, ".")
+
+	// Navigate through the nested structure
+	var current any = body
+	for i, k := range keys {
+		// Check if current is a map
+		currentMap, ok := current.(map[string]any)
+		if !ok {
+			tester.t.Errorf("Expected map at path '%s', but got %T", strings.Join(keys[:i], "."), current)
+			return tester
+		}
+
+		// Check if key exists in current map
+		assert.Contains(tester.t, currentMap, k)
+
+		// If this is the last key, compare the value
+		if i == len(keys)-1 {
+			assert.Equal(tester.t, value, currentMap[k])
+		} else {
+			// Otherwise, move to the next level
+			current = currentMap[k]
+		}
+	}
+
 	return tester
 }
 

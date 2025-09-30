@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"log"
+
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
 	"github.com/omatheuscaetano/planus-api/internal/router"
@@ -15,12 +18,16 @@ import (
 func main() {
 	env.Load()
 
-	mongodb := mongo.NewProductionMongoDb()
-	instances := dependency_container.InstantiateAll(
-		&dependency_container.InstancesConfig{
-			Mongo: mongodb,
-		},
-	)
+	mongo := mongo.NewProductionMongoDb()
+
+	err := mongo.Connect(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
+	}
+
+	instances := dependency_container.InstantiateAll(&dependency_container.InstancesConfig{
+		Mongo: mongo,
+	})
 
 	gin := gin.Default()
 

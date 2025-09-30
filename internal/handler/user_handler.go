@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+	"github.com/omatheuscaetano/planus-api/internal/dto"
 	"github.com/omatheuscaetano/planus-api/internal/model"
+	"github.com/omatheuscaetano/planus-api/internal/response"
 	"github.com/omatheuscaetano/planus-api/internal/service"
 )
 
@@ -25,18 +25,33 @@ func (h *UserHandler) Find(c *gin.Context) {
 	id := c.Param("id")
 	user, err := h.s.Find(c.Request.Context(), model.ID(id))
 	if err != nil {
-		c.JSON(err.Code, err)
+		response.Error(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, user)
+	response.Ok(c, user)
 }
 
 func (h *UserHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	err := h.s.Delete(c.Request.Context(), model.ID(id))
 	if err != nil {
-		c.JSON(err.Code, err)
+		response.Error(c, err)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	response.NoContent(c)
+}
+
+func (h *UserHandler) Create(c *gin.Context) {
+	var dto dto.CreateUserDTO
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		response.BadRequest(c, err)
+		return
+	}
+
+	user, err := h.s.Create(c.Request.Context(), &dto)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Created(c, user)
 }
