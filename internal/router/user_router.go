@@ -3,10 +3,13 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/omatheuscaetano/planus-api/internal/dependency_container"
+	"github.com/omatheuscaetano/planus-api/internal/middleware"
 )
 
 func UserRouter(g *gin.Engine, i *dependency_container.UserInstances) {
-	g.Group("/user").
+	group := g.Group("/user")
+	group.Use(middleware.JWTMiddleware())
+	group.
 		GET("/:id", i.Handlers.User.Find).
 		POST("", i.Handlers.User.Create).
 		DELETE("/:id", i.Handlers.User.Delete)
