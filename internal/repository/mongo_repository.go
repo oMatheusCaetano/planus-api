@@ -27,20 +27,24 @@ func (r *mongoRepository[T]) collection() *driver.Collection {
 	return r.c.db.Collection(r.c.collectionName)
 }
 
-func (r *mongoRepository[T]) Find(ctx context.Context, id model.ID) (*T, *errs.Error) {
-	result := new(T)
-	err := r.collection().FindOne(ctx, bson.M{"_id": id.String()}).Decode(result)
-	if err != nil {
-		return nil, errs.From(err)
-	}
-
-	if hook, ok := any(result).(interface{ OnRead() *errs.Error }); ok {
-		if err := hook.OnRead(); err != nil {
-			return nil, err
+func (r *mongoRepository[T]) findWhere(ctx context.Context, filter interface{}) (*T, *errs.Error) {
+		result := new(T)
+		err := r.collection().FindOne(ctx, filter).Decode(result)
+		if err != nil {
+			return nil, errs.From(err)
 		}
-	}
 
-	return result, nil
+		if hook, ok := any(result).(interface{ OnRead() *errs.Error }); ok {
+			if err := hook.OnRead(); err != nil {
+				return nil, err
+			}
+		}
+
+		return result, nil
+}
+
+func (r *mongoRepository[T]) Find(ctx context.Context, id model.ID) (*T, *errs.Error) {
+	return r.findWhere(ctx, bson.M{"_id": id.String()})
 }
 
 func (r *mongoRepository[T]) Delete(ctx context.Context, id model.ID) *errs.Error {

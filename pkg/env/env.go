@@ -71,3 +71,7 @@ func DBTestPassword() string {
 func Timezone() string {
 	return Get("TIMEZONE")
 }
+
+func JWTSecret() string {
+	return Get("JWT_SECRET")
+}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/omatheuscaetano/planus-api/internal/dto"
 	"github.com/omatheuscaetano/planus-api/internal/model"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestFind(t *testing.T) {
@@ -85,7 +86,7 @@ func TestCreate(t *testing.T) {
 	}
 
 	t.Run("Should validate request and return 400", func(t *testing.T) {
-		dto := dto.CreateUserDTO{
+		dto := dto.CreateUser{
 			Name:     "",
 			Username: "johndoe",
 			Password: "abc",
@@ -99,17 +100,38 @@ func TestCreate(t *testing.T) {
 			AssertBodyValue("data.password", "Precisa ter no mínimo 6 caracteres")
 	})
 
-	// t.Run("Should create the user and return 204", func(t *testing.T) {
-	// 	dto := dto.CreateUserDTO{
-	// 		Name:     "John Doe",
-	// 		Username: "johndoe",
-	// 		Password: "plaintextpassword",
-	// 	}
+	t.Run("Should create the user and return 201", func(t *testing.T) {
+		dto := dto.CreateUser{
+			Name:     "John Doe",
+			Username: "johndoe@email.com",
+			Password: "plaintextpassword",
+		}
 
-	// 	tester.
-	// 		Post("/user", dto).
-	// 		AssertStatus(201).
-	// 		AssertBodyValue("name", dto.Name).
-	// 		AssertBodyValue("username", dto.Username)
-	// })
+		tester.
+			Post("/user", dto).
+			AssertStatus(201).
+			AssertBodyValue("name", dto.Name).
+			AssertBodyValue("username", dto.Username)
+
+		res := tester.mongo.Collection("users").FindOne(context.Background(), map[string]any{
+			"username": dto.Username,
+		})
+
+		if res.Err() != nil {
+			t.Fatalf("failed to find user: %v", res.Err())
+		}
+
+		var user map[string]any
+		err = res.Decode(&user)
+		if err != nil {
+			t.Fatalf("failed to decode user: %v", err)
+		}
+
+		tester.
+			AssertBodyValue("id", user["_id"].(string)).
+			AssertBodyValue("name", user["name"].(string)).
+			AssertBodyValue("username", user["username"].(string)).
+			AssertBodyValueIsDateTime("created_at", user["created_at"].(primitive.DateTime).Time()).
+			AssertBodyValueIsDateTime("updated_at", user["updated_at"].(primitive.DateTime).Time())
+	})
 }

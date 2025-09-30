@@ -9,12 +9,14 @@ type InstancesConfig struct {
 }
 
 type Instances struct {
-	App *AppInstances
+	Auth *AuthInstances
+	App  *AppInstances
 	User *UserInstances
 }
 
 func InstantiateAll(c *InstancesConfig) *Instances {
 	return &Instances{
+		Auth: InstantiateAuth(c),
 		App: InstantiateApp(),
 		User: InstantiateUser(c),
 	}

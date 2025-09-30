@@ -42,7 +42,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 }
 
 func (h *UserHandler) Create(c *gin.Context) {
-	var dto dto.CreateUserDTO
+	var dto dto.CreateUser
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		response.BadRequest(c, err)
 		return

@@ -14,10 +14,24 @@ type UserInstances struct {
 	Handlers *UserHandlers
 }
 
+func NewUserMongoRepository(c *InstancesConfig) repository.UserRepository {
+	return repository.NewUserMongoRepository(c.Mongo)
+}
+
+func NewUserService(_ *InstancesConfig, repo repository.UserRepository) *service.UserService {
+	return service.NewUserService(repo)
+}
+
+func NewUserHandler(_ *InstancesConfig, svc *service.UserService) *handler.UserHandler {
+	return handler.NewUserHandler(svc)
+}
+
 func InstantiateUser(c *InstancesConfig) *UserInstances {
+
+
 	return &UserInstances{
 		Handlers: &UserHandlers{
-			User: handler.NewUserHandler(service.NewUserService(repository.NewUserMongoRepository(c.Mongo))),
+			User: NewUserHandler(c, NewUserService(c, NewUserMongoRepository(c))),
 		},
 	}
 }

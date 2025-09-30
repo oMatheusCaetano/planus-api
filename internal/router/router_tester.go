@@ -3,7 +3,7 @@ package router
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,6 +47,42 @@ func NewRouterTester(t *testing.T) *RouterTester {
 	return tester
 }
 
+func (tester *RouterTester) InsertToTable(table string, payload interface{}) any {
+	res, err := tester.mongo.Collection(table).InsertOne(context.Background(), payload)
+	if err != nil {
+		tester.t.Fatalf("failed to create user: %v", err)
+	}
+
+	if res.InsertedID == nil {
+		tester.t.Fatalf("failed to create user: no ID returned")
+	}
+
+	return res.InsertedID
+}
+
+func (tester *RouterTester) DropTable(table string) *RouterTester {
+	err := tester.mongo.Collection(table).Drop(context.Background())
+	if err != nil {
+		tester.t.Fatalf("failed to drop %s collection: %v", table, err)
+	}
+	return tester
+}
+
+func (tester *RouterTester) FindFromTable(table string, filter interface{}) map[string]any {
+	row := tester.mongo.Collection(table).FindOne(context.Background(), filter)
+
+	if row.Err() != nil {
+		tester.t.Fatalf("failed to find document in %s collection: %v", table, row.Err())
+	}
+
+	var entity map[string]any
+	err := row.Decode(&entity)
+	if err != nil {
+		tester.t.Fatalf("failed to decode document from %s collection: %v", table, err)
+	}
+	return entity
+}
+
 func (tester *RouterTester) Get(path string) *RouterTester {
 	tester.responseBody = nil
 	tester.response = httptest.NewRecorder()
@@ -77,12 +113,16 @@ func (tester *RouterTester) Post(path string, body any) *RouterTester {
 func (tester *RouterTester) Body() *map[string]any {
 	if (tester.responseBody == nil) {
 		bodyString := tester.response.Body.String()
-		log.Println("Response Body:", bodyString) // Debugging line
 		bodyMap := make(map[string]any)
 		json.Unmarshal([]byte(bodyString), &bodyMap)
 		tester.responseBody = bodyMap
 	}
 	return &tester.responseBody
+}
+
+func (tester *RouterTester) AssertEqual(expected interface{}, actual interface{}) *RouterTester {
+	assert.Equal(tester.t, expected, actual)
+	return tester
 }
 
 func (tester *RouterTester) AssertStatus(expected int) *RouterTester {
@@ -102,57 +142,80 @@ func (tester *RouterTester) AssertBodyKeyIsString(expected string) *RouterTester
 	return tester
 }
 
-func (tester *RouterTester) AssertBodyKeyIsDate(expected string) *RouterTester {
+func (tester *RouterTester) AssertBodyKeyIsNumeric(expected string) *RouterTester {
 	body := *tester.Body()
 	assert.Contains(tester.t, body, expected)
-	assert.IsType(tester.t, "", body[expected])
-
-	_, err := time.Parse(time.RFC3339, body[expected].(string))
-	assert.NoError(tester.t, err)
-
+	assert.IsType(tester.t, float64(0), body[expected])
 	return tester
 }
-
 
 func (tester *RouterTester) AssertBodyValue(key string, value any) *RouterTester {
 	body := *tester.Body()
 
-	// Split the key by dots to handle nested paths
-	keys := strings.Split(key, ".")
-
-	// Navigate through the nested structure
-	var current any = body
-	for i, k := range keys {
-		// Check if current is a map
-		currentMap, ok := current.(map[string]any)
-		if !ok {
-			tester.t.Errorf("Expected map at path '%s', but got %T", strings.Join(keys[:i], "."), current)
-			return tester
-		}
-
-		// Check if key exists in current map
-		assert.Contains(tester.t, currentMap, k)
-
-		// If this is the last key, compare the value
-		if i == len(keys)-1 {
-			assert.Equal(tester.t, value, currentMap[k])
-		} else {
-			// Otherwise, move to the next level
-			current = currentMap[k]
-		}
+	val, err := getNestedValue(body, key)
+	if err != nil {
+		tester.t.Errorf("failed to get value for key '%s': %v", key, err)
+		return tester
 	}
 
+	assert.Equal(tester.t, value, val)
 	return tester
 }
 
 func (tester *RouterTester) AssertBodyValueIsDateTime(key string, value time.Time) *RouterTester {
 	body := *tester.Body()
-	assert.Contains(tester.t, body, key)
-	assert.IsType(tester.t, "", body[key])
 
-	parsedTime, err := time.Parse(time.RFC3339, body[key].(string))
+	val, err := getNestedValue(body, key)
+	if err != nil {
+		tester.t.Errorf("failed to get value for key '%s': %v", key, err)
+		return tester
+	}
+
+	assert.IsType(tester.t, "", val)
+
+	parsedTime, err := time.Parse(time.RFC3339, val.(string))
 	assert.NoError(tester.t, err)
 	assert.Equal(tester.t, value.Format("2006-01-02 15:04:05"), parsedTime.Format("2006-01-02 15:04:05"))
 
 	return tester
+}
+
+func (tester *RouterTester) AssertBodyKeyIsJWT(key string) *RouterTester {
+	body := *tester.Body()
+
+	val, err := getNestedValue(body, key)
+	if err != nil {
+		tester.t.Errorf("failed to get value for key '%s': %v", key, err)
+		return tester
+	}
+
+	assert.IsType(tester.t, "", val)
+	tokenParts := strings.Split(val.(string), ".")
+	assert.Equal(tester.t, 3, len(tokenParts), "Invalid JWT format")
+
+	return tester
+}
+
+func getNestedValue(data map[string]any, path string) (any, error) {
+	keys := strings.Split(path, ".")
+	var current any = data
+
+	for i, k := range keys {
+		currentMap, ok := current.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("expected map at '%s', got %T", strings.Join(keys[:i], "."), current)
+		}
+
+		val, exists := currentMap[k]
+		if !exists {
+			return nil, fmt.Errorf("key '%s' not found at path '%s'", k, strings.Join(keys[:i], "."))
+		}
+
+		if i == len(keys)-1 {
+			return val, nil
+		}
+		current = val
+	}
+
+	return nil, fmt.Errorf("invalid path '%s'", path)
 }
